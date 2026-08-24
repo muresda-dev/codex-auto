@@ -2481,10 +2481,7 @@ async fn changing_directory_preserves_project_trust_permissions_history_and_hook
         if kind == "mcp" {
             assert_snapshot!(output, @"■ MCP inventory is still loading.");
         }
-        assert!(
-            output.contains(expected),
-            "kind={kind}, path={path}, expected={expected:?}, output={output:?}, user_config={original_user_config:?}"
-        );
+        assert!(output.contains(expected), "{path}");
         app.clear_committed_mcp_inventory_loading();
     }
     app.set_approvals_reviewer_in_app_and_widget(ApprovalsReviewer::AutoReview);
