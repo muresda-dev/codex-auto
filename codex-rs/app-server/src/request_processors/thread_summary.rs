@@ -184,6 +184,7 @@ pub(crate) fn thread_settings_from_config_snapshot(
             config_snapshot.active_permission_profile.clone(),
         ),
         model: config_snapshot.model.clone(),
+        model_selection: config_snapshot.model_selection,
         model_provider: config_snapshot.model_provider_id.clone(),
         service_tier: config_snapshot.service_tier.clone(),
         effort: config_snapshot.reasoning_effort.clone(),

@@ -21,6 +21,7 @@ fn thread_settings_for_test(
                 codex_app_server_protocol::ActivePermissionProfile::read_only(),
             ),
             model: model.to_string(),
+            model_selection: codex_protocol::openai_models::ModelSelectionMode::Manual,
             model_provider: "openai".to_string(),
             service_tier: Some(ServiceTier::Fast.request_value().to_string()),
             effort: Some(ReasoningEffortConfig::High),

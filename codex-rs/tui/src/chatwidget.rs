@@ -149,6 +149,8 @@ use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::items::AgentMessageContent;
 use codex_protocol::items::AgentMessageItem;
 use codex_protocol::models::MessagePhase;
+use codex_protocol::openai_models::ModelSelectionMode;
+use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::plan_tool::PlanItemArg as UpdatePlanItemArg;
 use codex_protocol::plan_tool::StepStatus as UpdatePlanItemStatus;
 use codex_protocol::request_permissions::RequestPermissionsEvent;
@@ -562,6 +564,10 @@ pub(crate) struct ChatWidget {
     current_collaboration_mode: CollaborationMode,
     /// The currently active collaboration mask, if any.
     active_collaboration_mask: Option<CollaborationModeMask>,
+    /// Whether the thread uses an explicit model or the local Auto router.
+    model_selection: ModelSelectionMode,
+    /// The last real model chosen by Auto for a user turn.
+    auto_model_route: Option<(String, ReasoningEffort)>,
     has_chatgpt_account: bool,
     has_codex_backend_auth: bool,
     model_catalog: Arc<ModelCatalog>,

@@ -325,6 +325,7 @@ use codex_protocol::mcp::ClientMcpExtensions;
 use codex_protocol::models::LocalImagePreparation;
 use codex_protocol::models::ResponseInputItem;
 use codex_protocol::models::ResponseItem;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::openai_models::ReasoningEffort as ReasoningEffortConfig;
 use codex_protocol::protocol::ApplyPatchApprovalRequestEvent;
 use codex_protocol::protocol::AskForApproval;
@@ -697,6 +698,7 @@ impl Session {
                 Some(Arc::clone(&auth_manager)),
             ),
             collaboration_mode,
+            model_selection: ModelSelectionMode::Manual,
             model_reasoning_summary: config.model_reasoning_summary,
             service_tier,
             developer_instructions: config.developer_instructions.clone(),

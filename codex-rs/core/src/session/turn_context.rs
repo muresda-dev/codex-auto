@@ -2,6 +2,10 @@ use super::*;
 use crate::environment_selection::EnvironmentConfigOrigin;
 use crate::environment_selection::TurnEnvironmentSnapshot;
 use crate::exec_policy::AllowPrefixRules;
+use crate::model_router::CatalogModelRouter;
+use crate::model_router::ModelRouteDecision;
+use crate::model_router::ModelRouterRequest;
+use crate::model_router::route_or_fallback;
 use crate::shell_snapshot::ShellSnapshotFile;
 use crate::tools::sandboxing::executor_windows_sandbox_level;
 use codex_core_plugins::PluginCommandAttribution;
@@ -16,13 +20,17 @@ use codex_protocol::config_types::ShellEnvironmentPolicy;
 use codex_protocol::models::AdditionalPermissionProfile;
 use codex_protocol::openai_models::MODEL_SPECIALTY_CYBER;
 use codex_protocol::openai_models::ModelInfo;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::permissions::RawFileSystemSandboxPolicy;
+use codex_protocol::protocol::AutoModelRouteEvent;
 use codex_protocol::protocol::EnvironmentConfig;
 use codex_protocol::protocol::EnvironmentConfigState;
 use codex_protocol::protocol::ErrorEvent;
+use codex_protocol::protocol::ModelSelectionChangedEvent;
 use codex_protocol::protocol::MultiAgentVersion;
 use codex_protocol::protocol::ThreadHistoryMode;
 use codex_protocol::protocol::TurnEnvironmentSelection;
+use codex_protocol::user_input::UserInput;
 use codex_sandboxing::policy_transforms::effective_permission_profile;
 use codex_skills_extension::HostSkillsSnapshot;
 use codex_utils_path_uri::PathUri;
@@ -736,11 +744,22 @@ impl Session {
         }
     }
 
+    #[cfg(test)]
     pub(crate) async fn new_turn_with_sub_id(
         &self,
         sub_id: String,
         updates: SessionSettingsUpdate,
     ) -> CodexResult<Arc<TurnContext>> {
+        self.new_turn_with_user_input(sub_id, updates, &[]).await
+    }
+
+    pub(crate) async fn new_turn_with_user_input(
+        &self,
+        sub_id: String,
+        updates: SessionSettingsUpdate,
+        user_input: &[UserInput],
+    ) -> CodexResult<Arc<TurnContext>> {
+        let model_selection = updates.model_selection;
         let notify_config_contributors = !self.services.extensions.config_contributors().is_empty();
         let update_result: CodexResult<_> = {
             let mut state = self.state.lock().await;
@@ -807,6 +826,15 @@ impl Session {
             }
         };
         self.emit_config_changed_contributors(previous_config.as_ref(), new_config.as_ref());
+        if let Some(model_selection) = model_selection {
+            self.send_event_raw(Event {
+                id: sub_id.clone(),
+                msg: EventMsg::ModelSelectionChanged(ModelSelectionChangedEvent {
+                    model_selection,
+                }),
+            })
+            .await;
+        }
         if mcp_inputs_changed {
             self.schedule_mcp_prewarm();
         }
@@ -815,6 +843,19 @@ impl Session {
             self.refresh_managed_network_proxy_for_current_permission_profile()
                 .await;
         }
+        let (session_configuration, auto_route) = self
+            .resolve_auto_model_route(session_configuration, user_input)
+            .await;
+        if let Some(route) = auto_route {
+            self.send_event_raw(Event {
+                id: sub_id.clone(),
+                msg: EventMsg::AutoModelRoute(AutoModelRouteEvent {
+                    model: route.model,
+                    reasoning_effort: route.effort,
+                }),
+            })
+            .await;
+        }
         Ok(self
             .new_turn_from_configuration(
                 sub_id,
@@ -822,6 +863,42 @@ impl Session {
                 updates.final_output_json_schema,
             )
             .await)
+    }
+
+    async fn resolve_auto_model_route(
+        &self,
+        mut session_configuration: SessionConfiguration,
+        user_input: &[UserInput],
+    ) -> (SessionConfiguration, Option<ModelRouteDecision>) {
+        if session_configuration.model_selection != ModelSelectionMode::Auto
+            || user_input.is_empty()
+        {
+            return (session_configuration, None);
+        }
+
+        let catalog = self
+            .services
+            .models_manager
+            .try_list_models()
+            .unwrap_or_default();
+        let has_previous_turn = self.previous_turn_settings().await.is_some();
+        let decision = route_or_fallback(
+            &CatalogModelRouter,
+            &ModelRouterRequest {
+                input: user_input,
+                catalog: &catalog,
+                fallback_model: session_configuration.collaboration_mode.model(),
+                fallback_effort: session_configuration.collaboration_mode.reasoning_effort(),
+                has_previous_turn,
+            },
+        );
+        session_configuration.collaboration_mode =
+            session_configuration.collaboration_mode.with_updates(
+                Some(decision.model.clone()),
+                Some(Some(decision.effort.clone())),
+                /*developer_instructions*/ None,
+            );
+        (session_configuration, Some(decision))
     }
 
     async fn new_turn_from_configuration(

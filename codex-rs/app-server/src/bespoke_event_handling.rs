@@ -13,6 +13,7 @@ use crate::thread_status::ThreadWatchActiveGuard;
 use crate::thread_status::ThreadWatchManager;
 use codex_app_server_protocol::AccountRateLimitsUpdatedNotification;
 use codex_app_server_protocol::AdditionalPermissionProfile as V2AdditionalPermissionProfile;
+use codex_app_server_protocol::AutoModelRouteSelectedNotification;
 use codex_app_server_protocol::CodexErrorInfo as V2CodexErrorInfo;
 use codex_app_server_protocol::CommandAction as V2ParsedCommand;
 use codex_app_server_protocol::CommandExecutionApprovalDecision;
@@ -377,6 +378,17 @@ pub(crate) async fn apply_bespoke_event_handling(
             };
             outgoing
                 .send_server_notification(ServerNotification::ModelRerouted(notification))
+                .await;
+        }
+        EventMsg::AutoModelRoute(event) => {
+            let notification = AutoModelRouteSelectedNotification {
+                thread_id: conversation_id.to_string(),
+                turn_id: event_turn_id.clone(),
+                model: event.model,
+                reasoning_effort: event.reasoning_effort,
+            };
+            outgoing
+                .send_server_notification(ServerNotification::AutoModelRouteSelected(notification))
                 .await;
         }
         EventMsg::ModelVerification(event) => {
@@ -879,6 +891,7 @@ pub(crate) async fn apply_bespoke_event_handling(
         }
         EventMsg::DynamicToolCallRequest(_)
         | EventMsg::DynamicToolCallResponse(_)
+        | EventMsg::ModelSelectionChanged(_)
         | EventMsg::CollabAgentSpawnBegin(_)
         | EventMsg::CollabAgentSpawnEnd(_)
         | EventMsg::CollabAgentInteractionBegin(_)

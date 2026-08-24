@@ -16,8 +16,28 @@ use codex_protocol::config_types::ModeKind;
 use codex_protocol::models::BUILT_IN_PERMISSION_PROFILE_WORKSPACE;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::openai_models::MODEL_SPECIALTY_CYBER;
+use codex_protocol::openai_models::ModelSelectionMode;
 
 impl App {
+    pub(super) async fn sync_active_thread_model_selection_setting(
+        &mut self,
+        app_server: &mut AppServerSession,
+        model_selection: ModelSelectionMode,
+    ) {
+        let Some(thread_id) = self.active_thread_id else {
+            return;
+        };
+        self.send_thread_settings_update(
+            app_server,
+            ThreadSettingsUpdateParams {
+                thread_id: thread_id.to_string(),
+                model_selection: Some(model_selection),
+                ..ThreadSettingsUpdateParams::default()
+            },
+        )
+        .await;
+    }
+
     pub(super) async fn sync_active_thread_model_setting(
         &mut self,
         app_server: &mut AppServerSession,
@@ -252,6 +272,7 @@ fn thread_settings_update_has_changes(params: &ThreadSettingsUpdateParams) -> bo
     params.cwd.is_some()
         || params.approval_policy.is_some()
         || params.approvals_reviewer.is_some()
+        || params.model_selection.is_some()
         || params.sandbox_policy.is_some()
         || params.permissions.is_some()
         || params.model.is_some()

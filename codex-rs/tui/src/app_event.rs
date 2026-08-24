@@ -920,6 +920,9 @@ pub(crate) enum AppEvent {
     /// Update the current model slug in the running app and widget.
     UpdateModel(String),
 
+    /// Select manual model choice or local automatic routing for the active thread.
+    UpdateModelSelection(codex_protocol::openai_models::ModelSelectionMode),
+
     /// Update the current personality in the running app and widget.
     UpdatePersonality(Personality),
 

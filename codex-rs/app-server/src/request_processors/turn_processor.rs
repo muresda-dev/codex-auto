@@ -133,6 +133,7 @@ struct ThreadSettingsBuildParams {
     sandbox_policy: Option<codex_app_server_protocol::SandboxPolicy>,
     permissions: Option<String>,
     model: Option<String>,
+    model_selection: Option<codex_protocol::openai_models::ModelSelectionMode>,
     service_tier: Option<Option<String>>,
     effort: Option<ReasoningEffort>,
     summary: Option<ReasoningSummary>,
@@ -542,6 +543,7 @@ impl TurnRequestProcessor {
                     sandbox_policy: params.sandbox_policy,
                     permissions: params.permissions,
                     model: params.model,
+                    model_selection: params.model_selection,
                     service_tier: params.service_tier,
                     effort: params.effort,
                     summary: params.summary,
@@ -689,6 +691,7 @@ impl TurnRequestProcessor {
             sandbox_policy,
             permissions,
             model,
+            model_selection,
             service_tier,
             effort,
             summary,
@@ -699,6 +702,15 @@ impl TurnRequestProcessor {
         if sandbox_policy.is_some() && permissions.is_some() {
             return Err(invalid_request(
                 "`permissions` cannot be combined with `sandboxPolicy`",
+            ));
+        }
+
+        if model
+            .as_deref()
+            .is_some_and(|model| model.eq_ignore_ascii_case("auto"))
+        {
+            return Err(invalid_request(
+                "`model` must be a provider model id; use `modelSelection: \"auto\"` for automatic routing",
             ));
         }
 
@@ -720,6 +732,7 @@ impl TurnRequestProcessor {
             || sandbox_policy.is_some()
             || permissions.is_some()
             || model.is_some()
+            || model_selection.is_some()
             || service_tier.is_some()
             || effort.is_some()
             || summary.is_some()
@@ -788,6 +801,7 @@ impl TurnRequestProcessor {
                     profile_workspace_roots: profile_workspace_roots.clone(),
                     windows_sandbox_level: None,
                     model: model.clone(),
+                    model_selection,
                     effort: effort.clone(),
                     summary,
                     service_tier: service_tier.clone(),
@@ -810,6 +824,7 @@ impl TurnRequestProcessor {
             active_permission_profile,
             windows_sandbox_level: None,
             model,
+            model_selection,
             effort,
             summary,
             service_tier,
@@ -846,6 +861,7 @@ impl TurnRequestProcessor {
                     sandbox_policy: params.sandbox_policy,
                     permissions: params.permissions,
                     model: params.model,
+                    model_selection: params.model_selection,
                     service_tier: params.service_tier,
                     effort: params.effort,
                     summary: params.summary,

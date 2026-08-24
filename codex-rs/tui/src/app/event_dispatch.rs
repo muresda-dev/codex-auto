@@ -1488,6 +1488,8 @@ impl App {
                     .await;
             }
             AppEvent::UpdateModel(model) => {
+                self.chat_widget
+                    .set_model_selection(codex_protocol::openai_models::ModelSelectionMode::Manual);
                 let model_changed = self.chat_widget.current_model() != model
                     || self.chat_widget.current_collaboration_mode().model() != model;
                 if model_changed {
@@ -1497,6 +1499,11 @@ impl App {
                     self.sync_active_thread_service_tier_to_cached_session()
                         .await;
                 }
+            }
+            AppEvent::UpdateModelSelection(model_selection) => {
+                self.chat_widget.set_model_selection(model_selection);
+                self.sync_active_thread_model_selection_setting(app_server, model_selection)
+                    .await;
             }
             AppEvent::UpdatePersonality(personality) => {
                 self.on_update_personality(personality);
@@ -1532,6 +1539,8 @@ impl App {
                 self.chat_widget.open_advanced_reasoning_popup(model);
             }
             AppEvent::ApplyAdvancedReasoning { model, effort } => {
+                self.chat_widget
+                    .set_model_selection(codex_protocol::openai_models::ModelSelectionMode::Manual);
                 let model_changed = self.chat_widget.current_model() != model
                     || self.chat_widget.current_collaboration_mode().model() != model;
                 let default_effort =

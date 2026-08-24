@@ -501,6 +501,10 @@ pub struct ThreadSettingsOverrides {
     /// Updated model slug. When set, the model info is derived automatically.
     pub model: Option<String>,
 
+    /// Updated model-selection mode. `Auto` keeps a local router enabled while
+    /// retaining a real model as the safe fallback.
+    pub model_selection: Option<crate::openai_models::ModelSelectionMode>,
+
     /// Updated reasoning effort (honored only for reasoning-capable models).
     ///
     /// Use `Some(Some(_))` to set a specific effort, `Some(None)` to clear the
@@ -1319,6 +1323,12 @@ pub enum EventMsg {
     /// Model routing changed from the requested model to a different model.
     ModelReroute(ModelRerouteEvent),
 
+    /// Local Auto model routing selected a real model for this turn.
+    AutoModelRoute(AutoModelRouteEvent),
+
+    /// The thread's local model selection mode changed.
+    ModelSelectionChanged(ModelSelectionChangedEvent),
+
     /// Backend recommends additional account verification for this turn.
     ModelVerification(ModelVerificationEvent),
 
@@ -1976,6 +1986,17 @@ pub struct ModelRerouteEvent {
     pub reason: ModelRerouteReason,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema, TS)]
+pub struct AutoModelRouteEvent {
+    pub model: String,
+    pub reasoning_effort: ReasoningEffortConfig,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, JsonSchema, TS)]
+pub struct ModelSelectionChangedEvent {
+    pub model_selection: crate::openai_models::ModelSelectionMode,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, JsonSchema, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(rename_all = "snake_case")]
@@ -2056,6 +2077,8 @@ pub struct ThreadSettingsAppliedEvent {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema, TS)]
 pub struct ThreadSettingsSnapshot {
     pub model: String,
+    #[serde(default)]
+    pub model_selection: crate::openai_models::ModelSelectionMode,
     pub model_provider_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_tier: Option<String>,
