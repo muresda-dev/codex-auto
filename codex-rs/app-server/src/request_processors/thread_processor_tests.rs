@@ -679,6 +679,7 @@ mod thread_processor_behavior_tests {
         let config_snapshot = ThreadConfigSnapshot {
             model: "gpt-5".to_string(),
             model_provider_id: "openai".to_string(),
+            model_selection: codex_protocol::openai_models::ModelSelectionMode::Manual,
             service_tier: Some("flex".to_string()),
             approval_policy: codex_protocol::protocol::AskForApproval::OnRequest,
             approvals_reviewer: codex_protocol::config_types::ApprovalsReviewer::User,
