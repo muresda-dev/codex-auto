@@ -2160,6 +2160,14 @@
     "ModelProviderCapabilitiesReadParams": {
       "type": "object"
     },
+    "ModelSelectionMode": {
+      "description": "Selects whether a thread uses a caller-chosen model or lets Codex choose a catalog-backed model for each user turn.\n\n`Auto` is a local routing mode. It is never a model identifier sent to a model provider.",
+      "enum": [
+        "manual",
+        "auto"
+      ],
+      "type": "string"
+    },
     "MultiAgentMode": {
       "description": "Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.",
       "oneOf": [
