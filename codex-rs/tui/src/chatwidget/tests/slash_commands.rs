@@ -431,11 +431,15 @@ async fn queued_settings_selection_applies_before_next_input() {
         "expected model menu to open; popup:\n{popup}"
     );
 
+    chat.handle_key_event(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
     chat.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
     assert_matches!(op_rx.try_recv(), Err(TryRecvError::Empty));
     while let Ok(event) = rx.try_recv() {
         match event {
             AppEvent::OpenReasoningPopup { model } => chat.open_reasoning_popup(model),
+            AppEvent::UpdateModelSelection(model_selection) => {
+                chat.set_model_selection(model_selection);
+            }
             AppEvent::UpdateModel(model) => chat.set_model(&model),
             AppEvent::UpdateReasoningEffort(effort) => chat.set_reasoning_effort(effort),
             AppEvent::SettingsSelectionClosed => {
