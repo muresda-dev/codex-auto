@@ -2483,7 +2483,7 @@ async fn changing_directory_preserves_project_trust_permissions_history_and_hook
         }
         assert!(
             output.contains(expected),
-            "kind={kind}, path={path}, expected={expected:?}, output={output:?}"
+            "kind={kind}, path={path}, expected={expected:?}, output={output:?}, user_config={original_user_config:?}"
         );
         app.clear_committed_mcp_inventory_loading();
     }
