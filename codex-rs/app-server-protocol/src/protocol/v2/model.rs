@@ -170,6 +170,22 @@ pub struct AutoModelRouteSelectedNotification {
     pub turn_id: String,
     pub model: String,
     pub reasoning_effort: ReasoningEffort,
+    #[serde(default)]
+    pub route_class: String,
+    #[serde(default)]
+    pub confidence: u8,
+    #[serde(default)]
+    pub terra_over_luna_gain: u8,
+    #[serde(default)]
+    pub sol_over_terra_gain: u8,
+    #[serde(default)]
+    pub signals: Vec<String>,
+    #[serde(default)]
+    pub inherited_previous: bool,
+    #[serde(default)]
+    pub escalated_retry: bool,
+    #[serde(default)]
+    pub used_fallback: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]

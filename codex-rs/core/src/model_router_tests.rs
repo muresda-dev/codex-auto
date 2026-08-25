@@ -43,10 +43,7 @@ fn text_only(family: &str, efforts: Vec<ReasoningEffort>) -> ModelPreset {
 
 fn standard_catalog() -> Vec<ModelPreset> {
     vec![
-        text_only(
-            "luna",
-            vec![ReasoningEffort::Low, ReasoningEffort::Medium],
-        ),
+        text_only("luna", vec![ReasoningEffort::Low, ReasoningEffort::Medium]),
         text_only(
             "terra",
             vec![ReasoningEffort::Medium, ReasoningEffort::High],
@@ -92,14 +89,17 @@ fn greeting_prefers_luna() {
 #[test]
 fn mechanical_long_prompt_stays_luna() {
     let filler = " value".repeat(2_500);
-    let prompt = format!("Rename this variable and run formatting. Do not change behavior.{filler}");
+    let prompt =
+        format!("Rename this variable and run formatting. Do not change behavior.{filler}");
     let decision = route_text(&prompt, "gpt-5.6-terra", None, false);
     assert_eq!(decision.model, "gpt-5.6-luna");
     assert!(decision.signals.iter().any(|signal| signal == "mechanical"));
-    assert!(decision
-        .signals
-        .iter()
-        .any(|signal| signal == "large-context"));
+    assert!(
+        decision
+            .signals
+            .iter()
+            .any(|signal| signal == "large-context")
+    );
 }
 
 #[test]
@@ -154,10 +154,12 @@ fn high_risk_short_prompt_has_sol_floor() {
     );
     assert_eq!(decision.model, "gpt-5.6-sol");
     assert!(effort_rank(&decision.effort).unwrap_or_default() >= 4);
-    assert!(decision
-        .signals
-        .iter()
-        .any(|signal| signal == "risk:critical" || signal == "risk:high"));
+    assert!(
+        decision
+            .signals
+            .iter()
+            .any(|signal| signal == "risk:critical" || signal == "risk:high")
+    );
 }
 
 #[test]
@@ -342,12 +344,7 @@ fn routing_regression_benchmark_covers_180_prompt_variants() {
     let mut cases = 0_usize;
     for suffix in neutral_suffixes {
         for prompt in routine {
-            let decision = route_text(
-                &format!("{prompt}{suffix}"),
-                "gpt-5.6-terra",
-                None,
-                false,
-            );
+            let decision = route_text(&format!("{prompt}{suffix}"), "gpt-5.6-terra", None, false);
             assert_eq!(
                 tier_for_model(&decision.model),
                 Some(ModelTier::Luna),
@@ -356,12 +353,7 @@ fn routing_regression_benchmark_covers_180_prompt_variants() {
             cases += 1;
         }
         for prompt in terra {
-            let decision = route_text(
-                &format!("{prompt}{suffix}"),
-                "gpt-5.6-terra",
-                None,
-                false,
-            );
+            let decision = route_text(&format!("{prompt}{suffix}"), "gpt-5.6-terra", None, false);
             assert_eq!(
                 tier_for_model(&decision.model),
                 Some(ModelTier::Terra),
@@ -371,12 +363,7 @@ fn routing_regression_benchmark_covers_180_prompt_variants() {
             cases += 1;
         }
         for prompt in sol {
-            let decision = route_text(
-                &format!("{prompt}{suffix}"),
-                "gpt-5.6-terra",
-                None,
-                false,
-            );
+            let decision = route_text(&format!("{prompt}{suffix}"), "gpt-5.6-terra", None, false);
             assert_eq!(
                 tier_for_model(&decision.model),
                 Some(ModelTier::Sol),

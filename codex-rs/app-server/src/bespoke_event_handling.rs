@@ -386,6 +386,14 @@ pub(crate) async fn apply_bespoke_event_handling(
                 turn_id: event_turn_id.clone(),
                 model: event.model,
                 reasoning_effort: event.reasoning_effort,
+                route_class: event.route_class,
+                confidence: event.confidence,
+                terra_over_luna_gain: event.terra_over_luna_gain,
+                sol_over_terra_gain: event.sol_over_terra_gain,
+                signals: event.signals,
+                inherited_previous: event.inherited_previous,
+                escalated_retry: event.escalated_retry,
+                used_fallback: event.used_fallback,
             };
             outgoing
                 .send_server_notification(ServerNotification::AutoModelRouteSelected(notification))

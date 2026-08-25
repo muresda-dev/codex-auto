@@ -81,6 +81,7 @@ use crate::version::CODEX_CLI_VERSION;
 use codex_app_server_protocol::AddCreditsNudgeCreditType;
 use codex_app_server_protocol::AddCreditsNudgeEmailStatus;
 use codex_app_server_protocol::AppSummary;
+use codex_app_server_protocol::AutoModelRouteSelectedNotification;
 use codex_app_server_protocol::CodexErrorInfo as AppServerCodexErrorInfo;
 use codex_app_server_protocol::CollabAgentTool;
 use codex_app_server_protocol::CollabAgentToolCallStatus;
@@ -566,7 +567,7 @@ pub(crate) struct ChatWidget {
     /// Whether the thread uses an explicit model or the local Auto router.
     model_selection: ModelSelectionMode,
     /// The last real model chosen by Auto for a user turn.
-    auto_model_route: Option<(String, ReasoningEffort)>,
+    auto_model_route: Option<AutoModelRouteSelectedNotification>,
     has_chatgpt_account: bool,
     has_codex_backend_auth: bool,
     model_catalog: Arc<ModelCatalog>,

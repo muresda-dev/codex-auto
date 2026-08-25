@@ -714,7 +714,7 @@ impl TaskProfile {
             TaskKind::Review => (24, 18),
             TaskKind::Architecture => (40, 42),
             TaskKind::Migration => (42, 46),
-            TaskKind::Research => (28, 30),
+            TaskKind::Research => (28, 14),
             TaskKind::Security => (35, 45),
         };
         terra += terra_kind;
@@ -888,7 +888,14 @@ impl ModelRouter for CatalogModelRouter {
         )
         .ok_or(ModelRouterError)?;
 
-        let mut target_effort = effort_for_need(profile.reasoning_need());
+        let reasoning_need = profile.reasoning_need();
+        let mut target_effort = if matches!(profile.depth, Depth::Exceptional)
+            || (profile.risk == Risk::Critical && reasoning_need >= 90)
+        {
+            ReasoningEffort::Max
+        } else {
+            effort_for_need(reasoning_need)
+        };
         if profile.risk >= Risk::High {
             target_effort = max_known_effort(target_effort, ReasoningEffort::High);
         }
@@ -1133,8 +1140,7 @@ fn effort_for_need(need: u8) -> ReasoningEffort {
     match need {
         0..=24 => ReasoningEffort::Low,
         25..=54 => ReasoningEffort::Medium,
-        55..=91 => ReasoningEffort::High,
-        _ => ReasoningEffort::Max,
+        _ => ReasoningEffort::High,
     }
 }
 

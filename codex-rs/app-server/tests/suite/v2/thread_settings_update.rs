@@ -141,8 +141,13 @@ async fn auto_model_selection_routes_each_turn_to_a_real_model_and_preserves_man
         mcp.read_notification("model/autoRouteSelected"),
     )
     .await??;
-    assert_eq!(first_route.model, "gpt-5.6-terra");
-    assert_eq!(first_route.reasoning_effort, ReasoningEffort::Medium);
+    assert_eq!(first_route.model, "gpt-5.6-luna");
+    assert!(matches!(
+        first_route.reasoning_effort,
+        ReasoningEffort::Low | ReasoningEffort::Medium
+    ));
+    assert_eq!(first_route.route_class, "routine");
+    assert!(first_route.confidence > 0);
     timeout(
         DEFAULT_TIMEOUT,
         mcp.read_stream_until_notification_message("turn/completed"),

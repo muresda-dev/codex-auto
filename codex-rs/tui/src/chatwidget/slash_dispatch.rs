@@ -288,6 +288,7 @@ impl ChatWidget {
                 self.open_model_popup();
                 self.defer_input_until_settings_applied();
             }
+            SlashCommand::Route => self.show_auto_route_details(),
             SlashCommand::Personality => {
                 self.open_personality_popup();
                 self.defer_input_until_settings_applied();
@@ -1122,6 +1123,7 @@ impl ChatWidget {
         match cmd {
             SlashCommand::Ide
             | SlashCommand::Status
+            | SlashCommand::Route
             | SlashCommand::Pwd
             | SlashCommand::Usage
             | SlashCommand::DebugConfig

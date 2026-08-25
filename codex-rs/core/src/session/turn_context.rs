@@ -847,11 +847,35 @@ impl Session {
             .resolve_auto_model_route(session_configuration, user_input)
             .await;
         if let Some(route) = auto_route {
+            tracing::info!(
+                target: "codex.auto_model.route",
+                turn_id = %sub_id,
+                model = %route.model,
+                effort = %route.effort,
+                route_class = route.route_class.as_str(),
+                confidence = route.confidence,
+                terra_over_luna_gain = route.terra_over_luna_gain,
+                sol_over_terra_gain = route.sol_over_terra_gain,
+                inherited_previous = route.inherited_previous,
+                escalated_retry = route.escalated_retry,
+                used_fallback = route.used_fallback,
+                signals = ?route.signals,
+                "auto model route selected"
+            );
+            let route_class = route.route_class.as_str().to_string();
             self.send_event_raw(Event {
                 id: sub_id.clone(),
                 msg: EventMsg::AutoModelRoute(AutoModelRouteEvent {
                     model: route.model,
                     reasoning_effort: route.effort,
+                    route_class,
+                    confidence: route.confidence,
+                    terra_over_luna_gain: route.terra_over_luna_gain,
+                    sol_over_terra_gain: route.sol_over_terra_gain,
+                    signals: route.signals,
+                    inherited_previous: route.inherited_previous,
+                    escalated_retry: route.escalated_retry,
+                    used_fallback: route.used_fallback,
                 }),
             })
             .await;
@@ -872,6 +896,9 @@ impl Session {
     ) -> (SessionConfiguration, Option<ModelRouteDecision>) {
         if session_configuration.model_selection != ModelSelectionMode::Auto
             || user_input.is_empty()
+            // Role-owned subagents and internal agents may carry explicit model/effort
+            // settings. Auto must not overwrite those role contracts.
+            || session_configuration.session_source.is_non_root_agent()
         {
             return (session_configuration, None);
         }

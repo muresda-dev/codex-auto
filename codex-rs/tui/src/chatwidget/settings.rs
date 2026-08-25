@@ -569,17 +569,54 @@ impl ChatWidget {
         self.refresh_model_dependent_surfaces();
     }
 
-    pub(crate) fn on_auto_model_route(&mut self, model: String, effort: ReasoningEffort) {
+    pub(crate) fn on_auto_model_route(&mut self, route: AutoModelRouteSelectedNotification) {
         if self.model_selection != ModelSelectionMode::Auto {
             return;
         }
-        self.auto_model_route = Some((model, effort));
+        self.auto_model_route = Some(route);
         self.refresh_model_dependent_surfaces();
         self.request_redraw();
     }
 
+    pub(crate) fn show_auto_route_details(&mut self) {
+        if self.model_selection != ModelSelectionMode::Auto {
+            self.add_info_message(
+                "Auto routing is not enabled. Use /model and choose Auto first.".to_string(),
+                /*hint*/ None,
+            );
+            return;
+        }
+        let Some(route) = self.auto_model_route.as_ref() else {
+            self.add_info_message(
+                "Auto has not routed a user turn yet. Send a prompt, then run /route.".to_string(),
+                /*hint*/ None,
+            );
+            return;
+        };
+        let signals = if route.signals.is_empty() {
+            "none".to_string()
+        } else {
+            route.signals.join(", ")
+        };
+        let yes_no = |value: bool| if value { "yes" } else { "no" };
+        let message = format!(
+            "Auto route\nModel: {}\nEffort: {}\nClass: {}\nConfidence: {}/100\nGain Luna → Terra: {}/100\nGain Terra → Sol: {}/100\nSignals: {}\nContinuation inherited: {}\nRetry escalation: {}\nCatalog fallback: {}",
+            route.model,
+            route.reasoning_effort,
+            route.route_class,
+            route.confidence,
+            route.terra_over_luna_gain,
+            route.sol_over_terra_gain,
+            signals,
+            yes_no(route.inherited_previous),
+            yes_no(route.escalated_retry),
+            yes_no(route.used_fallback),
+        );
+        self.add_info_message(message, /*hint*/ None);
+    }
     pub(crate) fn auto_model_route_display_name(&self) -> Option<String> {
-        let (model, effort) = self.auto_model_route.as_ref()?;
+        let route = self.auto_model_route.as_ref()?;
+        let model = &route.model;
         let display_name = self
             .model_catalog
             .try_list_models()
@@ -591,7 +628,10 @@ impl ChatWidget {
                     .map(|preset| preset.display_name.clone())
             })
             .unwrap_or_else(|| model.clone());
-        Some(format!("Auto → {display_name} · {effort}"))
+        Some(format!(
+            "Auto → {display_name} · {}",
+            route.reasoning_effort
+        ))
     }
 
     /// Get the label for the current collaboration mode.
