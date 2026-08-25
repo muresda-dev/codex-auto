@@ -18,15 +18,15 @@ jobs:
         with:
           ref: ci/windows-self-hosted
           fetch-depth: 1
-      - name: Locate final Auto route plumbing
+      - name: Locate current app-server schema generator
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== APP SERVER AUTO ROUTE ==='
-          grep -RIn -E -C 24 'AutoModelRouteSelected|AutoModelRouteEvent|autoModelRoute' codex-rs/app-server codex-rs/app-server-protocol || true
-          echo '=== CORE ROLE SOURCE ==='
-          grep -n -E -C 18 'resolve_auto_model_route|session_source' codex-rs/core/src/session/turn_context.rs | head -n 400 || true
-          echo '=== SETTINGS AUTO ROUTE ==='
-          grep -RIn -E -C 24 'fn on_auto_model_route|auto_model_route_display_name|auto_model_route = None' codex-rs/tui/src/chatwidget || true
-          echo '=== SLASH DISPATCH ==='
-          grep -RIn -E -C 22 'SlashCommand::Model|SlashCommand::Status|SlashCommand::DebugConfig' codex-rs/tui/src/chatwidget/slash_dispatch.rs codex-rs/tui/src/slash_command.rs | head -n 1200 || true
+          echo '=== JUST RECIPES ==='
+          grep -RIn -E -C 5 'app.server.*schema|schema.*app.server|write.*schema|generate.*schema' justfile codex-rs/justfile .github 2>/dev/null | head -n 1200 || true
+          echo '=== RUST SOURCES ==='
+          grep -RIn -E -C 8 'write_schema|write.*schema|generate_schema|generate.*schema|schema_fixtures|export.*schema|JsonSchema' codex-rs/app-server codex-rs/app-server-protocol codex-rs/app-server-interface codex-rs/cli 2>/dev/null | head -n 2000 || true
+          echo '=== BIN TARGETS / MANIFESTS ==='
+          grep -RIn -E -C 5 '^\[\[bin\]\]|^name = .*schema|schema.*bin|schema.*path' codex-rs/*/Cargo.toml | head -n 1600 || true
+          echo '=== FILE NAMES ==='
+          find codex-rs -type f \( -iname '*schema*' -o -iname '*export*' \) | sort | head -n 1000
