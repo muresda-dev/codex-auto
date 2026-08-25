@@ -29,7 +29,6 @@ jobs:
 
           router = Path('codex-rs/core/src/model_router.rs')
           text = router.read_text(encoding='utf-8')
-
           old = 'const TERRA_OVER_LUNA_THRESHOLD: u8 = 50;'
           new = 'const TERRA_OVER_LUNA_THRESHOLD: u8 = 45;'
           if old in text:
@@ -37,72 +36,76 @@ jobs:
           elif new not in text:
               raise SystemExit('Terra threshold anchor not found')
 
-          old_research = '''                "research",
-                "compare approaches",
-                "evaluate options",
-                "investigate alternatives",
-                "исследуй",
-                "сравни подход",
-                "оцени вариант",
-                "сравни вариант",'''
-          new_research = '''                "research",
-                "compare ",
-                "compare approaches",
-                "evaluate options",
-                "investigate alternatives",
-                "исследуй",
-                "сравни ",
-                "сравни подход",
-                "оцени вариант",
-                "сравни вариант",'''
+          old_research = '\n'.join([
+              '                "research",',
+              '                "compare approaches",',
+              '                "evaluate options",',
+              '                "investigate alternatives",',
+              '                "исследуй",',
+              '                "сравни подход",',
+              '                "оцени вариант",',
+              '                "сравни вариант",',
+          ])
+          new_research = '\n'.join([
+              '                "research",',
+              '                "compare ",',
+              '                "compare approaches",',
+              '                "evaluate options",',
+              '                "investigate alternatives",',
+              '                "исследуй",',
+              '                "сравни ",',
+              '                "сравни подход",',
+              '                "оцени вариант",',
+              '                "сравни вариант",',
+          ])
           if old_research in text:
               text = text.replace(old_research, new_research, 1)
           elif new_research not in text:
               raise SystemExit('Research signal anchor not found')
-
           router.write_text(text, encoding='utf-8')
 
           tests = Path('codex-rs/core/src/model_router_tests.rs')
           text = tests.read_text(encoding='utf-8')
-          marker = '''#[test]
-fn real_world_architecture_prompt_routes_to_sol_high() {'''
-          addition = r'''#[test]
-fn medium_explanations_and_technology_comparisons_prefer_terra() {
-    let prompts = [
-        "Объясни, почему в Django возникает проблема N+1 запросов. Сравни select_related и prefetch_related, приведи примеры, когда использовать каждый вариант, и назови типичные ошибки.",
-        "Сравни Celery и обычные фоновые задачи через asyncio для Django-приложения. Объясни преимущества и ограничения каждого подхода и в каких ситуациях ты выбрал бы один вместо другого.",
-    ];
-
-    for prompt in prompts {
-        let decision = route_text(prompt, "gpt-5.6-terra", None, false);
-        assert_eq!(
-            decision.model, "gpt-5.6-terra",
-            "medium analytical prompt should route to Terra: {prompt}; signals={:?}; terra_gain={}; sol_gain={}",
-            decision.signals, decision.terra_over_luna_gain, decision.sol_over_terra_gain
-        );
-        assert!(decision.terra_over_luna_gain >= TERRA_OVER_LUNA_THRESHOLD);
-        assert!(decision.sol_over_terra_gain < SOL_OVER_TERRA_THRESHOLD);
-    }
-}
-
-#[test]
-fn local_implementation_and_review_have_terra_floor_by_value() {
-    let prompts = [
-        "Реализуй в этом файле функцию нормализации данных и добавь тесты для основных случаев.",
-        "Проведи код-ревью этого файла, найди потенциальные ошибки и объясни замечания.",
-    ];
-
-    for prompt in prompts {
-        let decision = route_text(prompt, "gpt-5.6-terra", None, false);
-        assert_eq!(
-            decision.model, "gpt-5.6-terra",
-            "ordinary engineering work should route to Terra: {prompt}; signals={:?}; terra_gain={}; sol_gain={}",
-            decision.signals, decision.terra_over_luna_gain, decision.sol_over_terra_gain
-        );
-    }
-}
-
-'''
+          marker = '#[test]\nfn real_world_architecture_prompt_routes_to_sol_high() {'
+          lines = [
+              '#[test]',
+              'fn medium_explanations_and_technology_comparisons_prefer_terra() {',
+              '    let prompts = [',
+              '        "Объясни, почему в Django возникает проблема N+1 запросов. Сравни select_related и prefetch_related, приведи примеры, когда использовать каждый вариант, и назови типичные ошибки.",',
+              '        "Сравни Celery и обычные фоновые задачи через asyncio для Django-приложения. Объясни преимущества и ограничения каждого подхода и в каких ситуациях ты выбрал бы один вместо другого.",',
+              '    ];',
+              '',
+              '    for prompt in prompts {',
+              '        let decision = route_text(prompt, "gpt-5.6-terra", None, false);',
+              '        assert_eq!(',
+              '            decision.model, "gpt-5.6-terra",',
+              '            "medium analytical prompt should route to Terra: {prompt}; signals={:?}; terra_gain={}; sol_gain={}",',
+              '            decision.signals, decision.terra_over_luna_gain, decision.sol_over_terra_gain',
+              '        );',
+              '        assert!(decision.terra_over_luna_gain >= TERRA_OVER_LUNA_THRESHOLD);',
+              '        assert!(decision.sol_over_terra_gain < SOL_OVER_TERRA_THRESHOLD);',
+              '    }',
+              '}',
+              '',
+              '#[test]',
+              'fn local_implementation_and_review_have_terra_floor_by_value() {',
+              '    let prompts = [',
+              '        "Реализуй в этом файле функцию нормализации данных и добавь тесты для основных случаев.",',
+              '        "Проведи код-ревью этого файла, найди потенциальные ошибки и объясни замечания.",',
+              '    ];',
+              '',
+              '    for prompt in prompts {',
+              '        let decision = route_text(prompt, "gpt-5.6-terra", None, false);',
+              '        assert_eq!(',
+              '            decision.model, "gpt-5.6-terra",',
+              '            "ordinary engineering work should route to Terra: {prompt}; signals={:?}; terra_gain={}; sol_gain={}",',
+              '            decision.signals, decision.terra_over_luna_gain, decision.sol_over_terra_gain',
+              '        );',
+              '    }',
+              '}',
+              '',
+          ]
+          addition = '\n'.join(lines) + '\n'
           if 'fn medium_explanations_and_technology_comparisons_prefer_terra()' not in text:
               if marker not in text:
                   raise SystemExit('Test insertion anchor not found')
