@@ -1,0 +1,34 @@
+name: Router v3 integration inspect
+
+on:
+  push:
+    branches: [ci/windows-self-hosted]
+    paths:
+      - .github/workflows/router-v3-inspect.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ci/windows-self-hosted
+          fetch-depth: 1
+      - name: Locate Auto route integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== turn_context resolve ==='
+          rg -n -C 18 'resolve_auto_model_route|AutoModelRouteEvent|ModelRouterRequest' codex-rs/core/src/session/turn_context.rs || true
+          echo '=== protocol event ==='
+          rg -n -C 10 'struct AutoModelRouteEvent|AutoModelRoute\(' codex-rs/protocol/src/protocol.rs || true
+          echo '=== TUI auto route ==='
+          rg -n -C 14 'AutoModelRoute|auto_model_route|auto route|model_selection' codex-rs/tui/src || true
+          echo '=== slash dispatch ==='
+          rg -n -C 12 'SlashCommand::Model|SlashCommand::Status|SlashCommand::DebugConfig' codex-rs/tui/src/chatwidget.rs || true
+          echo '=== multi agent role/config ==='
+          rg -n -C 8 'role.*model|reasoning_effort.*role|role.*reasoning|parent_thread_id|SessionSource::SubAgent|SubAgent' codex-rs/core/src/session/turn_context.rs codex-rs/core/src/codex.rs codex-rs/core/src || true
