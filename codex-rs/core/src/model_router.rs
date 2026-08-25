@@ -88,14 +88,6 @@ enum ModelTier {
 }
 
 impl ModelTier {
-    fn preferred_family(self) -> &'static str {
-        match self {
-            Self::Luna => "luna",
-            Self::Terra => "terra",
-            Self::Sol => "sol",
-        }
-    }
-
     fn upgrade(self) -> Self {
         match self {
             Self::Luna => Self::Terra,
@@ -427,7 +419,9 @@ impl TaskProfile {
                 "several modules",
                 "across files",
                 "несколько файлов",
+                "нескольких файлов",
                 "несколько модул",
+                "нескольких модул",
             ],
         );
         let file_scope = contains_any(
@@ -579,7 +573,7 @@ impl TaskProfile {
                 ],
             );
         let depth = if error_material
-            && ambiguity >= 40
+            && ambiguity >= 20
             && matches!(scope, Scope::Repository | Scope::System)
         {
             Depth::Exceptional
@@ -710,7 +704,7 @@ impl TaskProfile {
         let (terra_kind, sol_kind) = match self.kind {
             TaskKind::Routine => (0, 0),
             TaskKind::Implementation => (28, 10),
-            TaskKind::Debugging => (32, 18),
+            TaskKind::Debugging => (32, 10),
             TaskKind::Review => (24, 18),
             TaskKind::Architecture => (40, 42),
             TaskKind::Migration => (42, 46),
