@@ -18,17 +18,23 @@ jobs:
         with:
           ref: ci/windows-self-hosted
           fetch-depth: 1
-      - name: Locate Auto route integration
+      - name: Locate final Router v3 integration points
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== turn_context resolve ==='
-          grep -n -E -C 18 'resolve_auto_model_route|AutoModelRouteEvent|ModelRouterRequest' codex-rs/core/src/session/turn_context.rs || true
-          echo '=== protocol event ==='
-          grep -n -E -C 10 'struct AutoModelRouteEvent|AutoModelRoute\(' codex-rs/protocol/src/protocol.rs || true
-          echo '=== TUI auto route ==='
-          grep -RIn -E -C 14 'AutoModelRoute|auto_model_route|auto route|model_selection' codex-rs/tui/src || true
-          echo '=== slash dispatch ==='
-          grep -n -E -C 12 'SlashCommand::Model|SlashCommand::Status|SlashCommand::DebugConfig' codex-rs/tui/src/chatwidget.rs || true
-          echo '=== multi agent role/config ==='
-          grep -RIn -E -C 8 'role.*model|reasoning_effort.*role|role.*reasoning|parent_thread_id|SessionSource::SubAgent|SubAgent' codex-rs/core/src/session/turn_context.rs codex-rs/core/src/codex.rs codex-rs/core/src || true
+          echo '=== CORE ROUTE EVENT + RESOLVER ==='
+          grep -n -E -C 28 'resolve_auto_model_route|AutoModelRouteEvent' codex-rs/core/src/session/turn_context.rs || true
+          echo '=== SESSION CONFIG / SOURCE ==='
+          grep -RIn -E -C 16 'struct SessionConfiguration|session_source:|SessionSource::SubAgent|parent_thread_id' codex-rs/core/src/session codex-rs/core/src/codex.rs | head -n 500 || true
+          echo '=== PROTOCOL AUTO EVENT ==='
+          grep -n -E -C 14 'struct AutoModelRouteEvent|AutoModelRoute\(' codex-rs/protocol/src/protocol.rs || true
+          echo '=== CHATWIDGET AUTO HANDLER ==='
+          grep -n -E -C 24 'EventMsg::AutoModelRoute|AutoModelRoute' codex-rs/tui/src/chatwidget.rs || true
+          echo '=== CHATWIDGET STRUCT ==='
+          grep -n -E -C 30 '^pub\(crate\)? struct ChatWidget|^pub struct ChatWidget|^struct ChatWidget' codex-rs/tui/src/chatwidget.rs || true
+          echo '=== CHATWIDGET INIT AROUND MODEL SELECTION ==='
+          grep -n -E -C 18 'model_selection:' codex-rs/tui/src/chatwidget.rs | head -n 300 || true
+          echo '=== SLASH ENUM ==='
+          cat codex-rs/tui/src/slash_command.rs
+          echo '=== SLASH DISPATCH ==='
+          grep -n -E -C 20 'SlashCommand::Model|SlashCommand::Status|SlashCommand::DebugConfig' codex-rs/tui/src/chatwidget.rs || true
