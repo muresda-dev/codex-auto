@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   calibrate:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -20,6 +19,11 @@ jobs:
       - name: Calibrate Terra range
         shell: bash
         run: |
+          if [ "$GITHUB_ACTOR" = "github-actions[bot]" ]; then
+            echo "Bot-triggered follow-up run; nothing to do."
+            exit 0
+          fi
+
           python - <<'PY'
           from pathlib import Path
 
