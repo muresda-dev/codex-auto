@@ -4,10 +4,12 @@
 use super::session::Session;
 use super::session::SessionSettingsUpdate;
 use crate::config::ConstraintResult;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::protocol::CodexErrorInfo;
 use codex_protocol::protocol::ErrorEvent;
 use codex_protocol::protocol::Event;
 use codex_protocol::protocol::EventMsg;
+use codex_protocol::protocol::ModelSelectionChangedEvent;
 use codex_protocol::protocol::ThreadSettingsAppliedEvent;
 use codex_protocol::protocol::ThreadSettingsOverrides;
 use std::sync::Arc;
@@ -48,12 +50,15 @@ pub(super) async fn prepare_update(
         active_permission_profile,
         windows_sandbox_level,
         model,
+        model_selection,
         effort,
         summary,
         service_tier,
         collaboration_mode,
         personality,
     } = overrides;
+    let manual_model_selected =
+        model.is_some() && model_selection != Some(ModelSelectionMode::Auto);
     let collaboration_mode = match collaboration_mode {
         Some(collaboration_mode) => collaboration_mode,
         None => {
@@ -76,6 +81,9 @@ pub(super) async fn prepare_update(
         active_permission_profile,
         windows_sandbox_level,
         collaboration_mode: Some(collaboration_mode),
+        model_selection: manual_model_selected
+            .then_some(ModelSelectionMode::Manual)
+            .or(model_selection),
         reasoning_summary: summary,
         service_tier,
         personality,
@@ -89,7 +97,18 @@ pub(super) async fn apply_update(
     submission_id: String,
     updates: SessionSettingsUpdate,
 ) -> ConstraintResult<()> {
+    let model_selection = updates.model_selection;
     session.update_settings(updates).await?;
+    if let Some(model_selection) = model_selection {
+        session
+            .send_event_raw(Event {
+                id: submission_id.clone(),
+                msg: EventMsg::ModelSelectionChanged(ModelSelectionChangedEvent {
+                    model_selection,
+                }),
+            })
+            .await;
+    }
     emit_applied(session, submission_id).await;
     Ok(())
 }

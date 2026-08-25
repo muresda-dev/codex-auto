@@ -1903,6 +1903,8 @@ server_notification_definitions! {
     /// Deprecated: Use `ContextCompaction` item type instead.
     ContextCompacted => "thread/compacted" (v2::ContextCompactedNotification),
     ModelRerouted => "model/rerouted" (v2::ModelReroutedNotification),
+    #[experimental("model/autoRouteSelected")]
+    AutoModelRouteSelected => "model/autoRouteSelected" (v2::AutoModelRouteSelectedNotification),
     ModelVerification => "model/verification" (v2::ModelVerificationNotification),
     #[experimental("turn/moderationMetadata")]
     TurnModerationMetadata => "turn/moderationMetadata" (v2::TurnModerationMetadataNotification),
@@ -4385,6 +4387,7 @@ mod tests {
                     sandbox_policy: v2::SandboxPolicy::DangerFullAccess,
                     active_permission_profile: None,
                     model: "gpt-5.4".to_string(),
+                    model_selection: codex_protocol::openai_models::ModelSelectionMode::Manual,
                     model_provider: "openai".to_string(),
                     service_tier: None,
                     effort: None,

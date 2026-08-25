@@ -56,6 +56,7 @@ impl App {
             cwd,
             active_permission_profile,
             model: turn_model,
+            model_selection,
             effort,
             collaboration_mode,
             ..
@@ -79,6 +80,7 @@ impl App {
             return;
         }
         *turn_model = model.clone();
+        *model_selection = codex_protocol::openai_models::ModelSelectionMode::Manual;
         *effort = Some(ReasoningEffortConfig::Low);
         *collaboration_mode = collaboration_mode.as_ref().map(|mode| {
             mode.with_updates(

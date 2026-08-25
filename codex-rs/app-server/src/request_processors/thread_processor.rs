@@ -1,4 +1,5 @@
 use super::persisted_resume_settings::PersistedResumeSettings;
+use super::persisted_resume_settings::latest_persisted_model_selection;
 use super::persisted_resume_settings::latest_persisted_resume_settings;
 use super::thread_enrichment::enrich_loaded_threads;
 use super::thread_fork_goal::inherit_thread_goal_snapshot;
@@ -19,6 +20,7 @@ use codex_extension_api::ThreadIdleCause;
 use codex_protocol::config_types::MultiAgentMode;
 use codex_protocol::error::CodexErrorDetails;
 use codex_protocol::mcp::ClientMcpExtensions;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::protocol::ThreadHistoryMode;
 use codex_thread_store::PersistContext;
 
@@ -3692,6 +3694,8 @@ impl ThreadRequestProcessor {
         }
         let has_explicit_model_resume_override =
             has_model_resume_override(request_overrides.as_ref(), &typesafe_overrides);
+        let persisted_model_selection =
+            latest_persisted_model_selection(thread_history.get_rollout_items());
         let persisted_metadata = self
             .load_and_apply_persisted_resume_metadata(
                 &thread_history,
@@ -3748,6 +3752,20 @@ impl ThreadRequestProcessor {
                 .await
                 {
                     self.outgoing.send_error(request_id, err).await;
+                    return Ok(());
+                }
+                if !has_explicit_model_resume_override
+                    && persisted_model_selection == ModelSelectionMode::Auto
+                    && let Err(err) = codex_thread
+                        .restore_thread_settings(CodexThreadSettingsOverrides {
+                            model_selection: Some(ModelSelectionMode::Auto),
+                            ..Default::default()
+                        })
+                        .await
+                {
+                    self.outgoing
+                        .send_error(request_id, internal_error(err.to_string()))
+                        .await;
                     return Ok(());
                 }
                 let instruction_sources = codex_thread.legacy_instruction_sources().await;
@@ -4602,6 +4620,7 @@ impl ThreadRequestProcessor {
             exclude_turns,
             defer_goal_continuation,
         } = params;
+        let has_explicit_model_fork_override = model.is_some();
         let include_turns = !exclude_turns;
         if sandbox.is_some() && permissions.is_some() {
             return Err(invalid_request(
@@ -4821,6 +4840,7 @@ impl ThreadRequestProcessor {
             };
             Arc::new(history_items)
         };
+        let persisted_model_selection = latest_persisted_model_selection(&history_items);
 
         let ephemeral_preview = if ephemeral {
             if paginated_source && last_turn_id.is_none() && before_turn_id.is_none() {
@@ -4906,6 +4926,17 @@ impl ThreadRequestProcessor {
             app_server_client_version,
         )
         .await?;
+        if !has_explicit_model_fork_override
+            && persisted_model_selection == ModelSelectionMode::Auto
+        {
+            forked_thread
+                .restore_thread_settings(CodexThreadSettingsOverrides {
+                    model_selection: Some(ModelSelectionMode::Auto),
+                    ..Default::default()
+                })
+                .await
+                .map_err(|err| internal_error(err.to_string()))?;
+        }
         if session_configured.rollout_path.is_some()
             && let Some(name) = source_thread_name.clone()
         {

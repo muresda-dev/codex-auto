@@ -267,6 +267,20 @@ pub struct ModelPreset {
     pub input_modalities: Vec<InputModality>,
 }
 
+/// Selects whether a thread uses a caller-chosen model or lets Codex choose a
+/// catalog-backed model for each user turn.
+///
+/// `Auto` is a local routing mode. It is never a model identifier sent to a
+/// model provider.
+#[derive(Debug, Default, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, TS, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum ModelSelectionMode {
+    #[default]
+    Manual,
+    Auto,
+}
+
 /// Visibility of a model in the picker or APIs.
 #[derive(
     Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, TS, JsonSchema, EnumIter, Display,

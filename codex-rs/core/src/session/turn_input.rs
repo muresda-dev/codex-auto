@@ -95,6 +95,7 @@ impl PreparedTurnInputSettings {
         self,
         session: &Arc<Session>,
         submission_id: String,
+        user_input: &[UserInput],
     ) -> CodexResult<Arc<TurnContext>> {
         let TurnStartOptions {
             final_output_json_schema,
@@ -107,7 +108,7 @@ impl PreparedTurnInputSettings {
 
         // new_turn_with_sub_id already emits an error event when settings are invalid.
         let turn_context = session
-            .new_turn_with_sub_id(submission_id.clone(), updates)
+            .new_turn_with_user_input(submission_id.clone(), updates, user_input)
             .await?;
         if emit_thread_settings_applied {
             thread_settings::emit_applied(session, submission_id).await;
@@ -209,7 +210,7 @@ async fn start_or_steer(
         }
         Err(NotSubmittedReason::NoActiveTurn) => {
             let turn_context = settings
-                .apply_started(session, submission_id.clone())
+                .apply_started(session, submission_id.clone(), &items)
                 .await?;
             if can_start_root_turn
                 && !items.is_empty()
@@ -313,7 +314,14 @@ async fn start_if_idle(
         });
     }
 
-    let turn_context = match settings.apply_started(session, submission_id.clone()).await {
+    let user_input = match &input {
+        SubmittedTurnInput::UserInput { content, .. } => content.as_slice(),
+        _ => &[],
+    };
+    let turn_context = match settings
+        .apply_started(session, submission_id.clone(), user_input)
+        .await
+    {
         Ok(turn_context) => turn_context,
         Err(error) => {
             session.clear_reserved_idle_turn(&turn_state).await;

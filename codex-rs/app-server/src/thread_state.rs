@@ -273,6 +273,7 @@ mod tests {
             },
             active_permission_profile: None,
             model: model.to_string(),
+            model_selection: codex_protocol::openai_models::ModelSelectionMode::Manual,
             model_provider: "mock_provider".to_string(),
             service_tier: None,
             effort: None,

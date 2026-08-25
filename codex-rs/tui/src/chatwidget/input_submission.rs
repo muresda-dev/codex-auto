@@ -359,6 +359,7 @@ impl ChatWidget {
             AskForApproval::from(self.config.permissions.approval_policy.value()),
             active_permission_profile,
             effective_mode.model().to_string(),
+            self.model_selection(),
             effective_mode.reasoning_effort(),
             /*summary*/ None,
             service_tier,

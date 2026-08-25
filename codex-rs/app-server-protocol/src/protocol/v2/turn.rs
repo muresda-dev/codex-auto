@@ -10,6 +10,7 @@ use codex_protocol::config_types::MultiAgentMode;
 use codex_protocol::config_types::Personality;
 use codex_protocol::config_types::ReasoningSummary;
 use codex_protocol::models::ImageDetail;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::plan_tool::PlanItemArg as CorePlanItemArg;
 use codex_protocol::plan_tool::StepStatus as CorePlanStepStatus;
@@ -122,6 +123,11 @@ pub struct TurnStartParams {
     /// Override the model for this turn and subsequent turns.
     #[ts(optional = nullable)]
     pub model: Option<String>,
+    /// Select manual model choice or local automatic routing for this and
+    /// subsequent turns. Auto never becomes a provider model id.
+    #[experimental("turn/start.modelSelection")]
+    #[ts(optional = nullable)]
+    pub model_selection: Option<ModelSelectionMode>,
     /// Override the service tier for this turn and subsequent turns.
     #[serde(
         default,

@@ -28,6 +28,7 @@ pub use codex_protocol::dynamic_tools::DynamicToolNamespaceSpec;
 pub use codex_protocol::dynamic_tools::DynamicToolNamespaceTool;
 pub use codex_protocol::dynamic_tools::DynamicToolSpec;
 use codex_protocol::models::ResponseItem;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::protocol::ThreadGoalStatus as CoreThreadGoalStatus;
 use codex_protocol::protocol::TokenUsage as CoreTokenUsage;
@@ -243,6 +244,11 @@ pub struct ThreadSettingsUpdateParams {
     /// Override the model for subsequent turns.
     #[ts(optional = nullable)]
     pub model: Option<String>,
+    /// Select manual model choice or local automatic routing for subsequent
+    /// turns. Auto never becomes a provider model id.
+    #[experimental("thread/settings/update.modelSelection")]
+    #[ts(optional = nullable)]
+    pub model_selection: Option<ModelSelectionMode>,
     /// Override the service tier for subsequent turns. `null` clears the
     /// current service tier; omission leaves it unchanged.
     #[serde(
@@ -290,6 +296,7 @@ pub struct ThreadSettings {
     pub sandbox_policy: SandboxPolicy,
     pub active_permission_profile: Option<ActivePermissionProfile>,
     pub model: String,
+    pub model_selection: ModelSelectionMode,
     pub model_provider: String,
     pub service_tier: Option<String>,
     pub effort: Option<ReasoningEffort>,

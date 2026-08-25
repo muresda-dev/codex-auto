@@ -1,5 +1,6 @@
 use codex_protocol::config_types::ApprovalsReviewer;
 use codex_protocol::models::ActivePermissionProfile;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::EventMsg;
 use codex_rollout::RolloutItem;
@@ -44,6 +45,22 @@ pub(super) fn latest_persisted_resume_settings(
             }
             _ => None,
         })
+}
+
+pub(super) fn latest_persisted_model_selection(history: &[RolloutItem]) -> ModelSelectionMode {
+    history
+        .iter()
+        .rev()
+        .find_map(|item| match item {
+            RolloutItem::EventMsg(EventMsg::ModelSelectionChanged(event)) => {
+                Some(event.model_selection)
+            }
+            RolloutItem::EventMsg(EventMsg::ThreadSettingsApplied(event)) => {
+                Some(event.thread_settings.model_selection)
+            }
+            _ => None,
+        })
+        .unwrap_or(ModelSelectionMode::Manual)
 }
 
 #[cfg(test)]

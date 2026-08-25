@@ -21,6 +21,7 @@ use codex_protocol::config_types::SERVICE_TIER_DEFAULT_REQUEST_VALUE;
 use codex_protocol::config_types::ServiceTier;
 use codex_protocol::config_types::ShellEnvironmentPolicy;
 use codex_protocol::mcp::ClientMcpExtensions;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::permissions::FileSystemPath;
 use codex_protocol::permissions::FileSystemSpecialPath;
 use codex_protocol::protocol::EnvironmentConfig;
@@ -76,6 +77,9 @@ pub(crate) struct SessionConfiguration {
     pub(super) provider: SharedModelProvider,
 
     pub(super) collaboration_mode: CollaborationMode,
+    /// Whether the stored model is used directly or is the safe fallback for
+    /// locally selected per-turn routing.
+    pub(super) model_selection: ModelSelectionMode,
     pub(super) model_reasoning_summary: Option<ReasoningSummaryConfig>,
     pub(super) service_tier: Option<String>,
 
@@ -220,6 +224,7 @@ impl SessionConfiguration {
             .unwrap_or_else(|| self.permission_profile_state.snapshot());
         ThreadConfigSnapshot {
             model: self.collaboration_mode.model().to_string(),
+            model_selection: self.model_selection,
             model_provider_id: self.original_config_do_not_use.model_provider_id.clone(),
             service_tier: self.service_tier.clone(),
             approval_policy: self.approval_policy.value(),
@@ -256,6 +261,7 @@ impl SessionConfiguration {
     ) -> ThreadSettingsSnapshot {
         ThreadSettingsSnapshot {
             model: self.collaboration_mode.model().to_string(),
+            model_selection: self.model_selection,
             model_provider_id: self.original_config_do_not_use.model_provider_id.clone(),
             service_tier: self.service_tier.clone(),
             approval_policy: self.approval_policy.value(),
@@ -292,6 +298,7 @@ impl SessionConfiguration {
             summary: self.model_reasoning_summary,
             service_tier: Some(self.service_tier.clone()),
             collaboration_mode: Some(self.collaboration_mode.clone()),
+            model_selection: Some(self.model_selection),
             personality: self.personality,
             ..Default::default()
         }
@@ -378,6 +385,9 @@ impl SessionConfiguration {
                 });
         if let Some(collaboration_mode) = updates.collaboration_mode.clone() {
             next_configuration.collaboration_mode = collaboration_mode;
+        }
+        if let Some(model_selection) = updates.model_selection {
+            next_configuration.model_selection = model_selection;
         }
         if let Some(summary) = updates.reasoning_summary {
             next_configuration.model_reasoning_summary = Some(summary);
@@ -590,6 +600,7 @@ pub(crate) struct SessionSettingsUpdate {
     pub(crate) active_permission_profile: Option<ActivePermissionProfile>,
     pub(crate) windows_sandbox_level: Option<WindowsSandboxLevel>,
     pub(crate) collaboration_mode: Option<CollaborationMode>,
+    pub(crate) model_selection: Option<ModelSelectionMode>,
     pub(crate) reasoning_summary: Option<ReasoningSummaryConfig>,
     pub(crate) service_tier: Option<Option<String>>,
     pub(crate) final_output_json_schema: Option<Option<Value>>,

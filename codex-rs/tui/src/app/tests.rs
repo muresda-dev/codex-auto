@@ -8391,6 +8391,7 @@ async fn inactive_thread_settings_notification_updates_cached_collaboration_mode
                 codex_app_server_protocol::ActivePermissionProfile::read_only(),
             ),
             model: "gpt-plan".to_string(),
+            model_selection: codex_protocol::openai_models::ModelSelectionMode::Manual,
             model_provider: "openai".to_string(),
             service_tier: None,
             effort: collaboration_mode.settings.reasoning_effort.clone(),

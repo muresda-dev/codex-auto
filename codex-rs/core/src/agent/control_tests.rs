@@ -1186,6 +1186,7 @@ async fn spawn_agent_fork_from_paginated_parent_uses_model_context_prefix() {
                 ThreadSettingsAppliedEvent {
                     thread_settings: ThreadSettingsSnapshot {
                         model: "parent-only-model".to_string(),
+                        model_selection: codex_protocol::openai_models::ModelSelectionMode::Manual,
                         model_provider_id: "parent-only-provider".to_string(),
                         service_tier: None,
                         approval_policy: AskForApproval::Never,

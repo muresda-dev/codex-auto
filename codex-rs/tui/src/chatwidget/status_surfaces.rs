@@ -922,6 +922,9 @@ impl ChatWidget {
     }
 
     fn model_with_reasoning_display_name(&self) -> String {
+        if let Some(route) = self.auto_model_route_display_name() {
+            return route;
+        }
         let label = self.reasoning_display_name();
         let service_tier_label = self
             .current_service_tier()

@@ -116,6 +116,8 @@ impl ChatWidget {
             skills_initial_state: None,
             current_collaboration_mode,
             active_collaboration_mask,
+            model_selection: ModelSelectionMode::Manual,
+            auto_model_route: None,
             has_chatgpt_account,
             has_codex_backend_auth,
             model_catalog,

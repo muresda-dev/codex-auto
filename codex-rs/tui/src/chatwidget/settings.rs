@@ -457,6 +457,10 @@ impl ChatWidget {
         self.set_approval_policy(settings.approval_policy);
         self.set_approvals_reviewer(settings.approvals_reviewer.to_core());
         self.config.personality = settings.personality;
+        self.model_selection = settings.model_selection;
+        if self.model_selection == ModelSelectionMode::Manual {
+            self.auto_model_route = None;
+        }
 
         let permission_profile = PermissionProfile::from_legacy_sandbox_policy_for_cwd(
             &settings.sandbox_policy.to_core(),
@@ -542,12 +546,52 @@ impl ChatWidget {
     }
 
     pub(super) fn model_display_name(&self) -> &str {
+        if self.model_selection == ModelSelectionMode::Auto {
+            return "Auto";
+        }
         let model = self.current_model();
         if model.is_empty() {
             DEFAULT_MODEL_DISPLAY_NAME
         } else {
             model
         }
+    }
+
+    pub(crate) fn model_selection(&self) -> ModelSelectionMode {
+        self.model_selection
+    }
+
+    pub(crate) fn set_model_selection(&mut self, model_selection: ModelSelectionMode) {
+        self.model_selection = model_selection;
+        if model_selection == ModelSelectionMode::Manual {
+            self.auto_model_route = None;
+        }
+        self.refresh_model_dependent_surfaces();
+    }
+
+    pub(crate) fn on_auto_model_route(&mut self, model: String, effort: ReasoningEffort) {
+        if self.model_selection != ModelSelectionMode::Auto {
+            return;
+        }
+        self.auto_model_route = Some((model, effort));
+        self.refresh_model_dependent_surfaces();
+        self.request_redraw();
+    }
+
+    pub(crate) fn auto_model_route_display_name(&self) -> Option<String> {
+        let (model, effort) = self.auto_model_route.as_ref()?;
+        let display_name = self
+            .model_catalog
+            .try_list_models()
+            .ok()
+            .and_then(|models| {
+                models
+                    .iter()
+                    .find(|preset| preset.model == *model)
+                    .map(|preset| preset.display_name.clone())
+            })
+            .unwrap_or_else(|| model.clone());
+        Some(format!("Auto → {display_name} · {effort}"))
     }
 
     /// Get the label for the current collaboration mode.

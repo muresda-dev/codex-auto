@@ -1,4 +1,5 @@
 use super::PersistedResumeSettings;
+use super::latest_persisted_model_selection;
 use super::latest_persisted_resume_settings;
 use codex_protocol::config_types::ApprovalsReviewer;
 use codex_protocol::config_types::CollaborationMode;
@@ -6,8 +7,10 @@ use codex_protocol::config_types::ModeKind;
 use codex_protocol::config_types::Settings;
 use codex_protocol::models::ActivePermissionProfile;
 use codex_protocol::models::PermissionProfile;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::EventMsg;
+use codex_protocol::protocol::ModelSelectionChangedEvent;
 use codex_protocol::protocol::SandboxPolicy;
 use codex_protocol::protocol::ThreadSettingsAppliedEvent;
 use codex_protocol::protocol::ThreadSettingsSnapshot;
@@ -30,6 +33,7 @@ fn settings_item(
         ThreadSettingsAppliedEvent {
             thread_settings: ThreadSettingsSnapshot {
                 model: "gpt-5".to_string(),
+                model_selection: ModelSelectionMode::Manual,
                 model_provider_id: "openai".to_string(),
                 service_tier: None,
                 approval_policy,
@@ -51,6 +55,31 @@ fn settings_item(
             },
         },
     ))
+}
+
+#[test]
+fn latest_model_selection_event_wins_for_resume_and_fork_history() {
+    let history = vec![
+        RolloutItem::EventMsg(EventMsg::ModelSelectionChanged(
+            ModelSelectionChangedEvent {
+                model_selection: ModelSelectionMode::Auto,
+            },
+        )),
+        RolloutItem::EventMsg(EventMsg::ModelSelectionChanged(
+            ModelSelectionChangedEvent {
+                model_selection: ModelSelectionMode::Manual,
+            },
+        )),
+    ];
+
+    assert_eq!(
+        latest_persisted_model_selection(&history),
+        ModelSelectionMode::Manual
+    );
+    assert_eq!(
+        latest_persisted_model_selection(&history[..1]),
+        ModelSelectionMode::Auto
+    );
 }
 
 fn turn_context_item(

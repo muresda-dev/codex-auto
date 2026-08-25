@@ -132,6 +132,9 @@ pub(super) fn server_notification_thread_target(
             Some(notification.thread_id.as_str())
         }
         ServerNotification::ContextCompacted(notification) => Some(notification.thread_id.as_str()),
+        ServerNotification::AutoModelRouteSelected(notification) => {
+            Some(notification.thread_id.as_str())
+        }
         ServerNotification::ModelRerouted(notification) => Some(notification.thread_id.as_str()),
         ServerNotification::ModelVerification(notification) => {
             Some(notification.thread_id.as_str())
@@ -238,6 +241,7 @@ mod tests {
             },
             active_permission_profile: None,
             model: "gpt-5.4".to_string(),
+            model_selection: codex_protocol::openai_models::ModelSelectionMode::Manual,
             model_provider: "openai".to_string(),
             service_tier: None,
             effort: Some(ReasoningEffort::High),

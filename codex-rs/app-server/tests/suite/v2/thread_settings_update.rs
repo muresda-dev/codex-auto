@@ -5,6 +5,7 @@ use app_test_support::TestAppServer;
 use app_test_support::create_final_assistant_message_sse_response;
 use app_test_support::create_mock_responses_server_sequence_unchecked;
 use app_test_support::write_models_cache;
+use codex_app_server_protocol::AutoModelRouteSelectedNotification;
 use codex_app_server_protocol::JSONRPCError;
 use codex_app_server_protocol::RequestId;
 use codex_app_server_protocol::SandboxPolicy;
@@ -20,6 +21,8 @@ use codex_app_server_protocol::TurnStartResponse;
 use codex_app_server_protocol::UserInput as V2UserInput;
 use codex_core::test_support::all_model_presets;
 use codex_protocol::config_types::SERVICE_TIER_DEFAULT_REQUEST_VALUE;
+use codex_protocol::openai_models::ModelSelectionMode;
+use codex_protocol::openai_models::ReasoningEffort;
 use core_test_support::responses;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
@@ -89,6 +92,110 @@ async fn thread_settings_update_emits_notification_and_updates_future_turns() ->
         }),
         "future turn did not use updated model/service tier: {request_bodies:#?}"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn auto_model_selection_routes_each_turn_to_a_real_model_and_preserves_manual_override()
+-> Result<()> {
+    let server = create_mock_responses_server_sequence_unchecked(vec![
+        create_final_assistant_message_sse_response("routine")?,
+        create_final_assistant_message_sse_response("complex")?,
+        create_final_assistant_message_sse_response("manual")?,
+    ])
+    .await;
+    let codex_home = TempDir::new()?;
+    create_config_toml(codex_home.path(), &server.uri())?;
+    write_models_cache(codex_home.path())?;
+
+    let mut mcp = TestAppServer::builder()
+        .with_codex_home(codex_home.path())
+        .build_initialized_with_timeout(DEFAULT_TIMEOUT)
+        .await?;
+    let thread = mcp
+        .start_thread(ThreadStartParams {
+            model: Some("gpt-5.6-terra".to_string()),
+            ..Default::default()
+        })
+        .await?
+        .thread;
+
+    send_thread_settings_update(
+        &mut mcp,
+        ThreadSettingsUpdateParams {
+            thread_id: thread.id.clone(),
+            model_selection: Some(ModelSelectionMode::Auto),
+            ..Default::default()
+        },
+    )
+    .await?;
+    let updated = read_thread_settings_updated(&mut mcp).await?;
+    assert_eq!(
+        updated.thread_settings.model_selection,
+        ModelSelectionMode::Auto
+    );
+
+    start_text_turn_with_input(&mut mcp, thread.id.clone(), "Rename this variable.").await?;
+    let first_route: AutoModelRouteSelectedNotification = timeout(
+        DEFAULT_TIMEOUT,
+        mcp.read_notification("model/autoRouteSelected"),
+    )
+    .await??;
+    assert_eq!(first_route.model, "gpt-5.6-terra");
+    assert_eq!(first_route.reasoning_effort, ReasoningEffort::Medium);
+    timeout(
+        DEFAULT_TIMEOUT,
+        mcp.read_stream_until_notification_message("turn/completed"),
+    )
+    .await??;
+
+    start_text_turn_with_input(
+        &mut mcp,
+        thread.id.clone(),
+        "Investigate this ambiguous distributed cache invalidation failure across the codebase. Here is the stack trace: panic",
+    )
+    .await?;
+    let second_route: AutoModelRouteSelectedNotification = timeout(
+        DEFAULT_TIMEOUT,
+        mcp.read_notification("model/autoRouteSelected"),
+    )
+    .await??;
+    assert_eq!(second_route.model, "gpt-5.6-sol");
+    assert_eq!(second_route.reasoning_effort, ReasoningEffort::Max);
+    timeout(
+        DEFAULT_TIMEOUT,
+        mcp.read_stream_until_notification_message("turn/completed"),
+    )
+    .await??;
+
+    start_text_turn_with_params(
+        &mut mcp,
+        thread.id.clone(),
+        "Rename this variable.",
+        Some("gpt-5.6-sol".to_string()),
+        None,
+    )
+    .await?;
+    timeout(
+        DEFAULT_TIMEOUT,
+        mcp.read_stream_until_notification_message("turn/completed"),
+    )
+    .await??;
+
+    let request_bodies = received_response_bodies(&server).await?;
+    assert_eq!(request_bodies.len(), 3);
+    assert_eq!(request_bodies[0]["model"], "gpt-5.6-terra");
+    assert_eq!(request_bodies[0]["reasoning"]["effort"], "medium");
+    assert_eq!(request_bodies[1]["model"], "gpt-5.6-sol");
+    assert_eq!(request_bodies[1]["reasoning"]["effort"], "max");
+    assert_eq!(request_bodies[2]["model"], "gpt-5.6-sol");
+    assert!(
+        request_bodies
+            .iter()
+            .all(|body| body["model"].as_str() != Some("Auto")),
+        "Auto must remain local and never reach the model provider"
+    );
+
     Ok(())
 }
 
@@ -372,13 +479,33 @@ async fn send_thread_settings_update(
 }
 
 async fn start_text_turn(mcp: &mut TestAppServer, thread_id: String) -> Result<()> {
+    start_text_turn_with_params(mcp, thread_id, "hello", None, None).await
+}
+
+async fn start_text_turn_with_input(
+    mcp: &mut TestAppServer,
+    thread_id: String,
+    text: &str,
+) -> Result<()> {
+    start_text_turn_with_params(mcp, thread_id, text, None, None).await
+}
+
+async fn start_text_turn_with_params(
+    mcp: &mut TestAppServer,
+    thread_id: String,
+    text: &str,
+    model: Option<String>,
+    model_selection: Option<ModelSelectionMode>,
+) -> Result<()> {
     let turn_request_id = mcp
         .send_turn_start_request(TurnStartParams {
             thread_id,
             input: vec![V2UserInput::Text {
-                text: "hello".to_string(),
+                text: text.to_string(),
                 text_elements: Vec::new(),
             }],
+            model,
+            model_selection,
             ..Default::default()
         })
         .await?;

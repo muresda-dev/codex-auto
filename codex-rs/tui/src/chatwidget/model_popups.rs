@@ -8,8 +8,7 @@ use super::*;
 const ULTRA_REASONING_CONCURRENCY_WARNING_THRESHOLD: usize = 8;
 
 impl ChatWidget {
-    /// Open a popup to choose a quick auto model. Selecting "All models"
-    /// opens the full picker with every available preset.
+    /// Open a popup to enable Auto routing or choose a concrete catalog model.
     pub(crate) fn open_model_popup(&mut self) {
         if !self.is_session_configured() {
             self.add_info_message(
@@ -88,55 +87,64 @@ impl ChatWidget {
             .into_iter()
             .partition(|preset| Self::is_auto_model(&preset.model));
 
-        if auto_presets.is_empty() {
-            self.open_all_models_popup(other_presets);
-            return;
-        }
-
         auto_presets.sort_by_key(|preset| Self::auto_model_order(&preset.model));
-        let mut items: Vec<SelectionItem> = auto_presets
-            .into_iter()
-            .map(|preset| {
-                let description =
-                    (!preset.description.is_empty()).then_some(preset.description.clone());
-                let model = preset.model.clone();
-                let requires_advanced_selection =
-                    Self::is_advanced_reasoning_effort(&preset.default_reasoning_effort)
-                        || preset
-                            .supported_reasoning_efforts
-                            .iter()
-                            .any(|option| Self::is_advanced_reasoning_effort(&option.effort));
-                let actions: Vec<SelectionAction> = if requires_advanced_selection {
-                    let preset_for_action = preset.clone();
-                    vec![Box::new(move |tx| {
-                        tx.send(AppEvent::OpenReasoningPopup {
-                            model: preset_for_action.clone(),
-                        });
-                    })]
-                } else {
-                    let should_prompt_plan_mode_scope = self
-                        .should_prompt_plan_mode_reasoning_scope(
-                            model.as_str(),
+        let mut items: Vec<SelectionItem> = vec![SelectionItem {
+            name: "Auto".to_string(),
+            description: Some(
+                "Choose a catalog-backed model and reasoning effort for each turn.".to_string(),
+            ),
+            is_current: self.model_selection() == ModelSelectionMode::Auto,
+            actions: vec![Box::new(|tx| {
+                tx.send(AppEvent::UpdateModelSelection(ModelSelectionMode::Auto));
+            })],
+            dismiss_on_select: true,
+            ..Default::default()
+        }];
+        items.extend(
+            auto_presets
+                .into_iter()
+                .map(|preset| {
+                    let description =
+                        (!preset.description.is_empty()).then_some(preset.description.clone());
+                    let model = preset.model.clone();
+                    let requires_advanced_selection =
+                        Self::is_advanced_reasoning_effort(&preset.default_reasoning_effort)
+                            || preset
+                                .supported_reasoning_efforts
+                                .iter()
+                                .any(|option| Self::is_advanced_reasoning_effort(&option.effort));
+                    let actions: Vec<SelectionAction> = if requires_advanced_selection {
+                        let preset_for_action = preset.clone();
+                        vec![Box::new(move |tx| {
+                            tx.send(AppEvent::OpenReasoningPopup {
+                                model: preset_for_action.clone(),
+                            });
+                        })]
+                    } else {
+                        let should_prompt_plan_mode_scope = self
+                            .should_prompt_plan_mode_reasoning_scope(
+                                model.as_str(),
+                                Some(preset.default_reasoning_effort.clone()),
+                            );
+                        self.model_selection_actions(
+                            model.clone(),
                             Some(preset.default_reasoning_effort.clone()),
-                        );
-                    self.model_selection_actions(
-                        model.clone(),
-                        Some(preset.default_reasoning_effort.clone()),
-                        should_prompt_plan_mode_scope,
-                    )
-                };
-                SelectionItem {
-                    name: model.clone(),
-                    description,
-                    is_current: model.as_str() == current_model,
-                    is_default: preset.is_default,
-                    actions,
-                    dismiss_on_select: !requires_advanced_selection,
-                    dismiss_parent_on_child_accept: requires_advanced_selection,
-                    ..Default::default()
-                }
-            })
-            .collect();
+                            should_prompt_plan_mode_scope,
+                        )
+                    };
+                    SelectionItem {
+                        name: model.clone(),
+                        description,
+                        is_current: model.as_str() == current_model,
+                        is_default: preset.is_default,
+                        actions,
+                        dismiss_on_select: !requires_advanced_selection,
+                        dismiss_parent_on_child_accept: requires_advanced_selection,
+                        ..Default::default()
+                    }
+                })
+                .collect::<Vec<_>>(),
+        );
 
         if !other_presets.is_empty() {
             let all_models = other_presets;
@@ -163,7 +171,7 @@ impl ChatWidget {
 
         let header = self.model_menu_header(
             "Select Model",
-            "Pick a quick auto mode or browse all models.",
+            "Enable Auto routing or choose a specific model and reasoning level.",
         );
         self.bottom_pane.show_selection_view(SelectionViewParams {
             footer_hint: Some(standard_popup_hint_line()),
@@ -253,6 +261,7 @@ impl ChatWidget {
                     effort: effort_for_action.clone(),
                 });
             } else {
+                tx.send(AppEvent::UpdateModelSelection(ModelSelectionMode::Manual));
                 tx.send(AppEvent::UpdateModel(model_for_action.clone()));
                 tx.send(AppEvent::UpdateReasoningEffort(effort_for_action.clone()));
                 tx.send(AppEvent::PersistModelSelection {

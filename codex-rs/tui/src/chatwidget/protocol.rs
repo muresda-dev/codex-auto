@@ -145,6 +145,9 @@ impl ChatWidget {
             ServerNotification::SkillsChanged(_) => {
                 self.refresh_skills_for_current_cwd(/*force_reload*/ true);
             }
+            ServerNotification::AutoModelRouteSelected(notification) => {
+                self.on_auto_model_route(notification.model, notification.reasoning_effort);
+            }
             ServerNotification::ModelRerouted(_) => {}
             ServerNotification::ModelVerification(notification) => {
                 self.on_app_server_model_verification(&notification.verifications)

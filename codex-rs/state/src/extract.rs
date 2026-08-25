@@ -595,6 +595,7 @@ mod tests {
             ThreadSettingsAppliedEvent {
                 thread_settings: ThreadSettingsSnapshot {
                     model: "gpt-5.2-codex".to_string(),
+                    model_selection: codex_protocol::openai_models::ModelSelectionMode::Manual,
                     model_provider_id: "updated-provider".to_string(),
                     service_tier: None,
                     approval_policy: AskForApproval::Never,

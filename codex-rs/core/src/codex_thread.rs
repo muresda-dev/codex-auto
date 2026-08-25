@@ -28,6 +28,7 @@ use codex_protocol::mcp::ClientMcpExtensions;
 use codex_protocol::models::ActivePermissionProfile;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::models::ResponseItem;
+use codex_protocol::openai_models::ModelSelectionMode;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::EnvironmentConfig;
@@ -78,6 +79,7 @@ static LIVE_THREADS: Gauge = Gauge::new("core.threads.live");
 #[derive(Clone, Debug)]
 pub struct ThreadConfigSnapshot {
     pub model: String,
+    pub model_selection: ModelSelectionMode,
     pub model_provider_id: String,
     pub service_tier: Option<String>,
     pub approval_policy: AskForApproval,
@@ -141,6 +143,7 @@ pub struct CodexThreadSettingsOverrides {
     pub active_permission_profile: Option<ActivePermissionProfile>,
     pub windows_sandbox_level: Option<WindowsSandboxLevel>,
     pub model: Option<String>,
+    pub model_selection: Option<ModelSelectionMode>,
     pub effort: Option<Option<ReasoningEffort>>,
     pub summary: Option<ReasoningSummary>,
     pub service_tier: Option<Option<String>>,
@@ -545,12 +548,15 @@ impl CodexThread {
             active_permission_profile,
             windows_sandbox_level,
             model,
+            model_selection,
             effort,
             summary,
             service_tier,
             collaboration_mode,
             personality,
         } = overrides;
+        let manual_model_selected =
+            model.is_some() && model_selection != Some(ModelSelectionMode::Auto);
         let collaboration_mode = if let Some(collaboration_mode) = collaboration_mode {
             collaboration_mode
         } else {
@@ -570,6 +576,9 @@ impl CodexThread {
             active_permission_profile,
             windows_sandbox_level,
             collaboration_mode: Some(collaboration_mode),
+            model_selection: manual_model_selected
+                .then_some(ModelSelectionMode::Manual)
+                .or(model_selection),
             reasoning_summary: summary,
             service_tier,
             personality,
