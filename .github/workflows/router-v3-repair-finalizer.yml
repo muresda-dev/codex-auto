@@ -29,31 +29,35 @@ jobs:
 
           finalizer = Path('.github/workflows/router-v3-finalize.yml')
           text = finalizer.read_text(encoding='utf-8')
-          old = '''      - name: Regenerate app-server protocol schemas
-        shell: bash
-        working-directory: codex-rs
-        run: cargo run -p codex-app-server --bin codex-write-app-server-schema
-'''
-          new = '''      - name: Regenerate app-server protocol schemas
-        shell: bash
-        working-directory: codex-rs
-        run: |
-          set -euo pipefail
-          python3 app-server-protocol/scripts/write_schema_fixtures.py
-          python3 app-server-protocol/scripts/write_schema_fixtures.py --experimental
-'''
+          old = "\n".join([
+              "      - name: Regenerate app-server protocol schemas",
+              "        shell: bash",
+              "        working-directory: codex-rs",
+              "        run: cargo run -p codex-app-server --bin codex-write-app-server-schema",
+          ]) + "\n"
+          new = "\n".join([
+              "      - name: Regenerate app-server protocol schemas",
+              "        shell: bash",
+              "        working-directory: codex-rs",
+              "        run: |",
+              "          set -euo pipefail",
+              "          python3 app-server-protocol/scripts/write_schema_fixtures.py",
+              "          python3 app-server-protocol/scripts/write_schema_fixtures.py --experimental",
+          ]) + "\n"
           if text.count(old) != 1:
               raise SystemExit(f'finalizer schema step: expected one match, got {text.count(old)}')
           finalizer.write_text(text.replace(old, new, 1), encoding='utf-8', newline='')
 
           justfile = Path('justfile')
           text = justfile.read_text(encoding='utf-8')
-          old = '''write-app-server-schema *args:
-    cargo run -p codex-app-server-protocol --bin write_schema_fixtures -- {args}
-'''
-          new = '''write-app-server-schema *args:
-    {{python}} app-server-protocol/scripts/write_schema_fixtures.py {args}
-'''
+          old = "\n".join([
+              "write-app-server-schema *args:",
+              "    cargo run -p codex-app-server-protocol --bin write_schema_fixtures -- {args}",
+          ]) + "\n"
+          new = "\n".join([
+              "write-app-server-schema *args:",
+              "    {{python}} app-server-protocol/scripts/write_schema_fixtures.py {args}",
+          ]) + "\n"
           if text.count(old) != 1:
               raise SystemExit(f'justfile schema recipe: expected one match, got {text.count(old)}')
           justfile.write_text(text.replace(old, new, 1), encoding='utf-8', newline='')
