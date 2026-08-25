@@ -1,0 +1,85 @@
+name: Run Router v3 finalization
+
+on:
+  push:
+    branches: [ci/windows-self-hosted]
+    paths:
+      - .github/workflows/router-v3-run-finalizer.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ci/windows-self-hosted
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Extract and apply Router v3 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source_lines = Path('.github/workflows/router-v3-finalize.yml').read_text(encoding='utf-8').splitlines()
+          start = next(i for i, line in enumerate(source_lines) if line.strip() == "python - <<'PY'")
+          end = next(i for i in range(start + 1, len(source_lines)) if source_lines[i].strip() == 'PY')
+          script_lines = []
+          for line in source_lines[start + 1:end]:
+              if 'Path(".github/workflows/' in line and '.unlink(' in line:
+                  continue
+              if line.startswith('          '):
+                  line = line[10:]
+              script_lines.append(line)
+          script = '\n'.join(script_lines) + '\n'
+          Path('/tmp/router_v3_apply.py').write_text(script, encoding='utf-8')
+          PY
+          python3 /tmp/router_v3_apply.py
+
+      - name: Repair app-server schema recipe
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('justfile')
+          text = path.read_text(encoding='utf-8')
+          old = "write-app-server-schema *args:\n    cargo run -p codex-app-server-protocol --bin write_schema_fixtures -- {args}\n"
+          new = "write-app-server-schema *args:\n    {{python}} app-server-protocol/scripts/write_schema_fixtures.py {args}\n"
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'justfile schema recipe: expected one match, got {count}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8', newline='')
+          PY
+
+      - name: Format Rust
+        shell: bash
+        working-directory: codex-rs
+        run: cargo fmt --all -- --config imports_granularity=Item
+
+      - name: Regenerate stable and experimental app-server schemas
+        shell: bash
+        working-directory: codex-rs
+        run: |
+          set -euo pipefail
+          python3 app-server-protocol/scripts/write_schema_fixtures.py
+          python3 app-server-protocol/scripts/write_schema_fixtures.py --experimental
+
+      - name: Commit Router v3 code
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add codex-rs justfile
+          git diff --cached --check
+          git status --short
+          git commit -m 'feat(auto): finish adaptive router v3 integration'
+          git push origin HEAD:ci/windows-self-hosted
