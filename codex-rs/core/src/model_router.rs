@@ -12,7 +12,7 @@ use codex_protocol::openai_models::ModelPreset;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::user_input::UserInput;
 
-const TERRA_OVER_LUNA_THRESHOLD: u8 = 50;
+const TERRA_OVER_LUNA_THRESHOLD: u8 = 45;
 const SOL_OVER_TERRA_THRESHOLD: u8 = 48;
 const LOW_CONFIDENCE_THRESHOLD: u8 = 55;
 
@@ -295,10 +295,12 @@ impl TaskProfile {
             &normalized,
             &[
                 "research",
+                "compare ",
                 "compare approaches",
                 "evaluate options",
                 "investigate alternatives",
                 "исследуй",
+                "сравни ",
                 "сравни подход",
                 "оцени вариант",
                 "сравни вариант",

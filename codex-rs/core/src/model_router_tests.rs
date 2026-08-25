@@ -118,6 +118,42 @@ fn normal_multi_file_implementation_prefers_terra() {
 }
 
 #[test]
+fn medium_explanations_and_technology_comparisons_prefer_terra() {
+    let prompts = [
+        "Объясни, почему в Django возникает проблема N+1 запросов. Сравни select_related и prefetch_related, приведи примеры, когда использовать каждый вариант, и назови типичные ошибки.",
+        "Сравни Celery и обычные фоновые задачи через asyncio для Django-приложения. Объясни преимущества и ограничения каждого подхода и в каких ситуациях ты выбрал бы один вместо другого.",
+    ];
+
+    for prompt in prompts {
+        let decision = route_text(prompt, "gpt-5.6-terra", None, false);
+        assert_eq!(
+            decision.model, "gpt-5.6-terra",
+            "medium analytical prompt should route to Terra: {prompt}; signals={:?}; terra_gain={}; sol_gain={}",
+            decision.signals, decision.terra_over_luna_gain, decision.sol_over_terra_gain
+        );
+        assert!(decision.terra_over_luna_gain >= TERRA_OVER_LUNA_THRESHOLD);
+        assert!(decision.sol_over_terra_gain < SOL_OVER_TERRA_THRESHOLD);
+    }
+}
+
+#[test]
+fn local_implementation_and_review_have_terra_floor_by_value() {
+    let prompts = [
+        "Реализуй в этом файле функцию нормализации данных и добавь тесты для основных случаев.",
+        "Проведи код-ревью этого файла, найди потенциальные ошибки и объясни замечания.",
+    ];
+
+    for prompt in prompts {
+        let decision = route_text(prompt, "gpt-5.6-terra", None, false);
+        assert_eq!(
+            decision.model, "gpt-5.6-terra",
+            "ordinary engineering work should route to Terra: {prompt}; signals={:?}; terra_gain={}; sol_gain={}",
+            decision.signals, decision.terra_over_luna_gain, decision.sol_over_terra_gain
+        );
+    }
+}
+
+#[test]
 fn real_world_architecture_prompt_routes_to_sol_high() {
     let decision = route_text(
         "Спроектируй архитектуру SaaS на Django для 100 тысяч активных пользователей: PostgreSQL, Redis, Celery, WebSocket, горизонтальное масштабирование. Сравни несколько вариантов архитектуры, укажи компромиссы, риски и предложи план миграции без простоя.",
