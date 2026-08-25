@@ -27,6 +27,9 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
+          def block(*lines: str) -> str:
+              return "\n".join(lines)
+
           def replace_once(path: str, old: str, new: str) -> None:
               p = Path(path)
               text = p.read_text(encoding="utf-8")
@@ -35,8 +38,7 @@ jobs:
                   raise SystemExit(f"{path}: expected exactly one match, got {count}\n--- needle ---\n{old}")
               p.write_text(text.replace(old, new, 1), encoding="utf-8", newline="")
 
-          # Router calibration: ordinary architecture should be Sol/high, while max is
-          # reserved for exceptional depth, critical risk, or retry escalation.
+          # Router calibration.
           replace_once(
               "codex-rs/core/src/model_router.rs",
               "            TaskKind::Research => (28, 30),",
@@ -45,182 +47,193 @@ jobs:
           replace_once(
               "codex-rs/core/src/model_router.rs",
               "        let mut target_effort = effort_for_need(profile.reasoning_need());",
-              """        let reasoning_need = profile.reasoning_need();
-          let mut target_effort = if matches!(profile.depth, Depth::Exceptional)
-              || (profile.risk == Risk::Critical && reasoning_need >= 90)
-          {
-              ReasoningEffort::Max
-          } else {
-              effort_for_need(reasoning_need)
-          };""",
+              block(
+                  "        let reasoning_need = profile.reasoning_need();",
+                  "        let mut target_effort = if matches!(profile.depth, Depth::Exceptional)",
+                  "            || (profile.risk == Risk::Critical && reasoning_need >= 90)",
+                  "        {",
+                  "            ReasoningEffort::Max",
+                  "        } else {",
+                  "            effort_for_need(reasoning_need)",
+                  "        };",
+              ),
           )
           replace_once(
               "codex-rs/core/src/model_router.rs",
-              """        55..=91 => ReasoningEffort::High,
-                  _ => ReasoningEffort::Max,""",
-              """        _ => ReasoningEffort::High,""",
+              block(
+                  "        55..=91 => ReasoningEffort::High,",
+                  "        _ => ReasoningEffort::Max,",
+              ),
+              "        _ => ReasoningEffort::High,",
           )
 
-          # Rich core event: enough information for telemetry and `/route` without
-          # recomputing the policy in clients.
+          # Rich core route event.
           replace_once(
               "codex-rs/protocol/src/protocol.rs",
-              """#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema, TS)]
-          pub struct AutoModelRouteEvent {
-              pub model: String,
-              pub reasoning_effort: ReasoningEffortConfig,
-          }""",
-              """#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema, TS)]
-          pub struct AutoModelRouteEvent {
-              pub model: String,
-              pub reasoning_effort: ReasoningEffortConfig,
-              #[serde(default)]
-              pub route_class: String,
-              #[serde(default)]
-              pub confidence: u8,
-              #[serde(default)]
-              pub terra_over_luna_gain: u8,
-              #[serde(default)]
-              pub sol_over_terra_gain: u8,
-              #[serde(default)]
-              pub signals: Vec<String>,
-              #[serde(default)]
-              pub inherited_previous: bool,
-              #[serde(default)]
-              pub escalated_retry: bool,
-              #[serde(default)]
-              pub used_fallback: bool,
-          }""",
+              block(
+                  "    pub reasoning_effort: ReasoningEffortConfig,",
+                  "}",
+                  "",
+                  "#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, JsonSchema, TS)]",
+              ),
+              block(
+                  "    pub reasoning_effort: ReasoningEffortConfig,",
+                  "    #[serde(default)]",
+                  "    pub route_class: String,",
+                  "    #[serde(default)]",
+                  "    pub confidence: u8,",
+                  "    #[serde(default)]",
+                  "    pub terra_over_luna_gain: u8,",
+                  "    #[serde(default)]",
+                  "    pub sol_over_terra_gain: u8,",
+                  "    #[serde(default)]",
+                  "    pub signals: Vec<String>,",
+                  "    #[serde(default)]",
+                  "    pub inherited_previous: bool,",
+                  "    #[serde(default)]",
+                  "    pub escalated_retry: bool,",
+                  "    #[serde(default)]",
+                  "    pub used_fallback: bool,",
+                  "}",
+                  "",
+                  "#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, JsonSchema, TS)]",
+              ),
           )
 
-          # Core routing integration: skip role-owned/non-root sessions, emit a
-          # correlation-friendly telemetry event, and forward the explanation.
+          # Core routing integration + telemetry + role-owned subagent guard.
           replace_once(
               "codex-rs/core/src/session/turn_context.rs",
-              """        if let Some(route) = auto_route {
-              self.send_event_raw(Event {
-                  id: sub_id.clone(),
-                  msg: EventMsg::AutoModelRoute(AutoModelRouteEvent {
-                      model: route.model,
-                      reasoning_effort: route.effort,
-                  }),
-              })
-              .await;
-          }""",
-              """        if let Some(route) = auto_route {
-              tracing::info!(
-                  target: "codex.auto_model.route",
-                  turn_id = %sub_id,
-                  model = %route.model,
-                  effort = %route.effort,
-                  route_class = route.route_class.as_str(),
-                  confidence = route.confidence,
-                  terra_over_luna_gain = route.terra_over_luna_gain,
-                  sol_over_terra_gain = route.sol_over_terra_gain,
-                  inherited_previous = route.inherited_previous,
-                  escalated_retry = route.escalated_retry,
-                  used_fallback = route.used_fallback,
-                  signals = ?route.signals,
-                  "auto model route selected"
-              );
-              let route_class = route.route_class.as_str().to_string();
-              self.send_event_raw(Event {
-                  id: sub_id.clone(),
-                  msg: EventMsg::AutoModelRoute(AutoModelRouteEvent {
-                      model: route.model,
-                      reasoning_effort: route.effort,
-                      route_class,
-                      confidence: route.confidence,
-                      terra_over_luna_gain: route.terra_over_luna_gain,
-                      sol_over_terra_gain: route.sol_over_terra_gain,
-                      signals: route.signals,
-                      inherited_previous: route.inherited_previous,
-                      escalated_retry: route.escalated_retry,
-                      used_fallback: route.used_fallback,
-                  }),
-              })
-              .await;
-          }""",
+              block(
+                  "        if let Some(route) = auto_route {",
+                  "            self.send_event_raw(Event {",
+              ),
+              block(
+                  "        if let Some(route) = auto_route {",
+                  "            tracing::info!(",
+                  "                target: \"codex.auto_model.route\",",
+                  "                turn_id = %sub_id,",
+                  "                model = %route.model,",
+                  "                effort = %route.effort,",
+                  "                route_class = route.route_class.as_str(),",
+                  "                confidence = route.confidence,",
+                  "                terra_over_luna_gain = route.terra_over_luna_gain,",
+                  "                sol_over_terra_gain = route.sol_over_terra_gain,",
+                  "                inherited_previous = route.inherited_previous,",
+                  "                escalated_retry = route.escalated_retry,",
+                  "                used_fallback = route.used_fallback,",
+                  "                signals = ?route.signals,",
+                  "                \"auto model route selected\"",
+                  "            );",
+                  "            let route_class = route.route_class.as_str().to_string();",
+                  "            self.send_event_raw(Event {",
+              ),
           )
           replace_once(
               "codex-rs/core/src/session/turn_context.rs",
-              """        if session_configuration.model_selection != ModelSelectionMode::Auto
-              || user_input.is_empty()
-          {
-              return (session_configuration, None);
-          }""",
-              """        if session_configuration.model_selection != ModelSelectionMode::Auto
-              || user_input.is_empty()
-              // Role-owned subagents and internal agents may carry explicit model/effort
-              // settings. Auto must not overwrite those role contracts.
-              || session_configuration.session_source.is_non_root_agent()
-          {
-              return (session_configuration, None);
-          }""",
+              block(
+                  "                    model: route.model,",
+                  "                    reasoning_effort: route.effort,",
+              ),
+              block(
+                  "                    model: route.model,",
+                  "                    reasoning_effort: route.effort,",
+                  "                    route_class,",
+                  "                    confidence: route.confidence,",
+                  "                    terra_over_luna_gain: route.terra_over_luna_gain,",
+                  "                    sol_over_terra_gain: route.sol_over_terra_gain,",
+                  "                    signals: route.signals,",
+                  "                    inherited_previous: route.inherited_previous,",
+                  "                    escalated_retry: route.escalated_retry,",
+                  "                    used_fallback: route.used_fallback,",
+              ),
+          )
+          replace_once(
+              "codex-rs/core/src/session/turn_context.rs",
+              block(
+                  "        if session_configuration.model_selection != ModelSelectionMode::Auto",
+                  "            || user_input.is_empty()",
+                  "        {",
+              ),
+              block(
+                  "        if session_configuration.model_selection != ModelSelectionMode::Auto",
+                  "            || user_input.is_empty()",
+                  "            // Role-owned subagents and internal agents may carry explicit model/effort",
+                  "            // settings. Auto must not overwrite those role contracts.",
+                  "            || session_configuration.session_source.is_non_root_agent()",
+                  "        {",
+              ),
           )
 
-          # App-server notification mirrors the rich core event.
+          # App-server notification mirrors the route explanation.
           replace_once(
               "codex-rs/app-server-protocol/src/protocol/v2/model.rs",
-              """pub struct AutoModelRouteSelectedNotification {
-              pub thread_id: String,
-              pub turn_id: String,
-              pub model: String,
-              pub reasoning_effort: ReasoningEffort,
-          }""",
-              """pub struct AutoModelRouteSelectedNotification {
-              pub thread_id: String,
-              pub turn_id: String,
-              pub model: String,
-              pub reasoning_effort: ReasoningEffort,
-              #[serde(default)]
-              pub route_class: String,
-              #[serde(default)]
-              pub confidence: u8,
-              #[serde(default)]
-              pub terra_over_luna_gain: u8,
-              #[serde(default)]
-              pub sol_over_terra_gain: u8,
-              #[serde(default)]
-              pub signals: Vec<String>,
-              #[serde(default)]
-              pub inherited_previous: bool,
-              #[serde(default)]
-              pub escalated_retry: bool,
-              #[serde(default)]
-              pub used_fallback: bool,
-          }""",
+              block(
+                  "pub struct AutoModelRouteSelectedNotification {",
+                  "    pub thread_id: String,",
+                  "    pub turn_id: String,",
+                  "    pub model: String,",
+                  "    pub reasoning_effort: ReasoningEffort,",
+                  "}",
+              ),
+              block(
+                  "pub struct AutoModelRouteSelectedNotification {",
+                  "    pub thread_id: String,",
+                  "    pub turn_id: String,",
+                  "    pub model: String,",
+                  "    pub reasoning_effort: ReasoningEffort,",
+                  "    #[serde(default)]",
+                  "    pub route_class: String,",
+                  "    #[serde(default)]",
+                  "    pub confidence: u8,",
+                  "    #[serde(default)]",
+                  "    pub terra_over_luna_gain: u8,",
+                  "    #[serde(default)]",
+                  "    pub sol_over_terra_gain: u8,",
+                  "    #[serde(default)]",
+                  "    pub signals: Vec<String>,",
+                  "    #[serde(default)]",
+                  "    pub inherited_previous: bool,",
+                  "    #[serde(default)]",
+                  "    pub escalated_retry: bool,",
+                  "    #[serde(default)]",
+                  "    pub used_fallback: bool,",
+                  "}",
+              ),
           )
           replace_once(
               "codex-rs/app-server/src/bespoke_event_handling.rs",
-              """            let notification = AutoModelRouteSelectedNotification {
-                  thread_id: conversation_id.to_string(),
-                  turn_id: event_turn_id.clone(),
-                  model: event.model,
-                  reasoning_effort: event.reasoning_effort,
-              };""",
-              """            let notification = AutoModelRouteSelectedNotification {
-                  thread_id: conversation_id.to_string(),
-                  turn_id: event_turn_id.clone(),
-                  model: event.model,
-                  reasoning_effort: event.reasoning_effort,
-                  route_class: event.route_class,
-                  confidence: event.confidence,
-                  terra_over_luna_gain: event.terra_over_luna_gain,
-                  sol_over_terra_gain: event.sol_over_terra_gain,
-                  signals: event.signals,
-                  inherited_previous: event.inherited_previous,
-                  escalated_retry: event.escalated_retry,
-                  used_fallback: event.used_fallback,
-              };""",
+              block(
+                  "                model: event.model,",
+                  "                reasoning_effort: event.reasoning_effort,",
+                  "            };",
+                  "            outgoing",
+                  "                .send_server_notification(ServerNotification::AutoModelRouteSelected(notification))",
+              ),
+              block(
+                  "                model: event.model,",
+                  "                reasoning_effort: event.reasoning_effort,",
+                  "                route_class: event.route_class,",
+                  "                confidence: event.confidence,",
+                  "                terra_over_luna_gain: event.terra_over_luna_gain,",
+                  "                sol_over_terra_gain: event.sol_over_terra_gain,",
+                  "                signals: event.signals,",
+                  "                inherited_previous: event.inherited_previous,",
+                  "                escalated_retry: event.escalated_retry,",
+                  "                used_fallback: event.used_fallback,",
+                  "            };",
+                  "            outgoing",
+                  "                .send_server_notification(ServerNotification::AutoModelRouteSelected(notification))",
+              ),
           )
 
-          # TUI keeps the full last notification so `/route` can explain the exact
-          # decision made by core rather than trying to reclassify locally.
+          # TUI stores the full route notification and exposes `/route`.
           replace_once(
               "codex-rs/tui/src/chatwidget.rs",
               "use codex_app_server_protocol::AppSummary;",
-              "use codex_app_server_protocol::AppSummary;\nuse codex_app_server_protocol::AutoModelRouteSelectedNotification;",
+              block(
+                  "use codex_app_server_protocol::AppSummary;",
+                  "use codex_app_server_protocol::AutoModelRouteSelectedNotification;",
+              ),
           )
           replace_once(
               "codex-rs/tui/src/chatwidget.rs",
@@ -229,118 +242,99 @@ jobs:
           )
           replace_once(
               "codex-rs/tui/src/chatwidget/protocol.rs",
-              """            ServerNotification::AutoModelRouteSelected(notification) => {
-                  self.on_auto_model_route(notification.model, notification.reasoning_effort);
-              }""",
-              """            ServerNotification::AutoModelRouteSelected(notification) => {
-                  self.on_auto_model_route(notification);
-              }""",
+              block(
+                  "            ServerNotification::AutoModelRouteSelected(notification) => {",
+                  "                self.on_auto_model_route(notification.model, notification.reasoning_effort);",
+                  "            }",
+              ),
+              block(
+                  "            ServerNotification::AutoModelRouteSelected(notification) => {",
+                  "                self.on_auto_model_route(notification);",
+                  "            }",
+              ),
           )
           replace_once(
               "codex-rs/tui/src/chatwidget/settings.rs",
-              """    pub(crate) fn on_auto_model_route(&mut self, model: String, effort: ReasoningEffort) {
-              if self.model_selection != ModelSelectionMode::Auto {
-                  return;
-              }
-              self.auto_model_route = Some((model, effort));
-              self.refresh_model_dependent_surfaces();
-              self.request_redraw();
-          }
-
-          pub(crate) fn auto_model_route_display_name(&self) -> Option<String> {
-              let (model, effort) = self.auto_model_route.as_ref()?;
-              let display_name = self
-                  .model_catalog
-                  .try_list_models()
-                  .ok()
-                  .and_then(|models| {
-                      models
-                          .iter()
-                          .find(|preset| preset.model == *model)
-                          .map(|preset| preset.display_name.clone())
-                  })
-                  .unwrap_or_else(|| model.clone());
-              Some(format!("Auto → {display_name} · {effort}"))
-          }""",
-              """    pub(crate) fn on_auto_model_route(
-              &mut self,
-              route: AutoModelRouteSelectedNotification,
-          ) {
-              if self.model_selection != ModelSelectionMode::Auto {
-                  return;
-              }
-              self.auto_model_route = Some(route);
-              self.refresh_model_dependent_surfaces();
-              self.request_redraw();
-          }
-
-          pub(crate) fn show_auto_route_details(&mut self) {
-              if self.model_selection != ModelSelectionMode::Auto {
-                  self.add_info_message(
-                      "Auto routing is not enabled. Use /model and choose Auto first.".to_string(),
-                      /*hint*/ None,
-                  );
-                  return;
-              }
-              let Some(route) = self.auto_model_route.as_ref() else {
-                  self.add_info_message(
-                      "Auto has not routed a user turn yet. Send a prompt, then run /route.".to_string(),
-                      /*hint*/ None,
-                  );
-                  return;
-              };
-              let signals = if route.signals.is_empty() {
-                  "none".to_string()
-              } else {
-                  route.signals.join(", ")
-              };
-              let yes_no = |value: bool| if value { "yes" } else { "no" };
-              let message = format!(
-                  "Auto route\nModel: {}\nEffort: {}\nClass: {}\nConfidence: {}/100\nGain Luna → Terra: {}/100\nGain Terra → Sol: {}/100\nSignals: {}\nContinuation inherited: {}\nRetry escalation: {}\nCatalog fallback: {}",
-                  route.model,
-                  route.reasoning_effort,
-                  route.route_class,
-                  route.confidence,
-                  route.terra_over_luna_gain,
-                  route.sol_over_terra_gain,
-                  signals,
-                  yes_no(route.inherited_previous),
-                  yes_no(route.escalated_retry),
-                  yes_no(route.used_fallback),
-              );
-              self.add_info_message(message, /*hint*/ None);
-          }
-
-          pub(crate) fn auto_model_route_display_name(&self) -> Option<String> {
-              let route = self.auto_model_route.as_ref()?;
-              let display_name = self
-                  .model_catalog
-                  .try_list_models()
-                  .ok()
-                  .and_then(|models| {
-                      models
-                          .iter()
-                          .find(|preset| preset.model == route.model)
-                          .map(|preset| preset.display_name.clone())
-                  })
-                  .unwrap_or_else(|| route.model.clone());
-              Some(format!(
-                  "Auto → {display_name} · {}",
-                  route.reasoning_effort
-              ))
-          }""",
+              "    pub(crate) fn on_auto_model_route(&mut self, model: String, effort: ReasoningEffort) {",
+              block(
+                  "    pub(crate) fn on_auto_model_route(",
+                  "        &mut self,",
+                  "        route: AutoModelRouteSelectedNotification,",
+                  "    ) {",
+              ),
           )
-
-          # `/route` is intentionally read-only and available while a turn is running.
           replace_once(
-              "codex-rs/tui/src/slash_command.rs",
-              "    Model,\n    Ide,",
-              "    Model,\n    Route,\n    Ide,",
+              "codex-rs/tui/src/chatwidget/settings.rs",
+              "        self.auto_model_route = Some((model, effort));",
+              "        self.auto_model_route = Some(route);",
           )
+          route_details = block(
+              "    pub(crate) fn show_auto_route_details(&mut self) {",
+              "        if self.model_selection != ModelSelectionMode::Auto {",
+              "            self.add_info_message(",
+              "                \"Auto routing is not enabled. Use /model and choose Auto first.\".to_string(),",
+              "                /*hint*/ None,",
+              "            );",
+              "            return;",
+              "        }",
+              "        let Some(route) = self.auto_model_route.as_ref() else {",
+              "            self.add_info_message(",
+              "                \"Auto has not routed a user turn yet. Send a prompt, then run /route.\".to_string(),",
+              "                /*hint*/ None,",
+              "            );",
+              "            return;",
+              "        };",
+              "        let signals = if route.signals.is_empty() {",
+              "            \"none\".to_string()",
+              "        } else {",
+              "            route.signals.join(\", \")",
+              "        };",
+              "        let yes_no = |value: bool| if value { \"yes\" } else { \"no\" };",
+              "        let message = format!(",
+              "            \"Auto route\\nModel: {}\\nEffort: {}\\nClass: {}\\nConfidence: {}/100\\nGain Luna → Terra: {}/100\\nGain Terra → Sol: {}/100\\nSignals: {}\\nContinuation inherited: {}\\nRetry escalation: {}\\nCatalog fallback: {}\",",
+              "            route.model,",
+              "            route.reasoning_effort,",
+              "            route.route_class,",
+              "            route.confidence,",
+              "            route.terra_over_luna_gain,",
+              "            route.sol_over_terra_gain,",
+              "            signals,",
+              "            yes_no(route.inherited_previous),",
+              "            yes_no(route.escalated_retry),",
+              "            yes_no(route.used_fallback),",
+              "        );",
+              "        self.add_info_message(message, /*hint*/ None);",
+              "    }",
+              "",
+          )
+          replace_once(
+              "codex-rs/tui/src/chatwidget/settings.rs",
+              "    pub(crate) fn auto_model_route_display_name(&self) -> Option<String> {",
+              route_details + "    pub(crate) fn auto_model_route_display_name(&self) -> Option<String> {",
+          )
+          replace_once(
+              "codex-rs/tui/src/chatwidget/settings.rs",
+              "        let (model, effort) = self.auto_model_route.as_ref()?;",
+              block(
+                  "        let route = self.auto_model_route.as_ref()?;",
+                  "        let model = &route.model;",
+              ),
+          )
+          replace_once(
+              "codex-rs/tui/src/chatwidget/settings.rs",
+              "        Some(format!(\"Auto → {display_name} · {effort}\"))",
+              "        Some(format!(\"Auto → {display_name} · {}\", route.reasoning_effort))",
+          )
+
+          # `/route` command plumbing.
+          replace_once("codex-rs/tui/src/slash_command.rs", "    Model,\n    Ide,", "    Model,\n    Route,\n    Ide,")
           replace_once(
               "codex-rs/tui/src/slash_command.rs",
               "            SlashCommand::Model => \"choose what model and reasoning effort to use\",",
-              "            SlashCommand::Model => \"choose what model and reasoning effort to use\",\n            SlashCommand::Route => \"explain the last Auto routing decision\",",
+              block(
+                  "            SlashCommand::Model => \"choose what model and reasoning effort to use\",",
+                  "            SlashCommand::Route => \"explain the last Auto routing decision\",",
+              ),
           )
           replace_once(
               "codex-rs/tui/src/slash_command.rs",
@@ -354,44 +348,46 @@ jobs:
           )
           replace_once(
               "codex-rs/tui/src/chatwidget/slash_dispatch.rs",
-              """            SlashCommand::Model => {
-                  self.open_model_popup();
-                  self.defer_input_until_settings_applied();
-              }
-              SlashCommand::Personality => {""",
-              """            SlashCommand::Model => {
-                  self.open_model_popup();
-                  self.defer_input_until_settings_applied();
-              }
-              SlashCommand::Route => self.show_auto_route_details(),
-              SlashCommand::Personality => {""",
+              block(
+                  "            SlashCommand::Model => {",
+                  "                self.open_model_popup();",
+                  "                self.defer_input_until_settings_applied();",
+                  "            }",
+                  "            SlashCommand::Personality => {",
+              ),
+              block(
+                  "            SlashCommand::Model => {",
+                  "                self.open_model_popup();",
+                  "                self.defer_input_until_settings_applied();",
+                  "            }",
+                  "            SlashCommand::Route => self.show_auto_route_details(),",
+                  "            SlashCommand::Personality => {",
+              ),
           )
           replace_once(
               "codex-rs/tui/src/chatwidget/slash_dispatch.rs",
-              """            SlashCommand::Ide
-              | SlashCommand::Status
-              | SlashCommand::Pwd""",
-              """            SlashCommand::Ide
-              | SlashCommand::Status
-              | SlashCommand::Route
-              | SlashCommand::Pwd""",
+              "            SlashCommand::Ide\n            | SlashCommand::Status\n            | SlashCommand::Pwd",
+              "            SlashCommand::Ide\n            | SlashCommand::Status\n            | SlashCommand::Route\n            | SlashCommand::Pwd",
           )
 
-          # App-server regression test now checks v3's cheap routine route and rich metadata.
+          # App-server regression test follows v3's routine route and metadata.
           replace_once(
               "codex-rs/app-server/tests/suite/v2/thread_settings_update.rs",
-              """    assert_eq!(first_route.model, "gpt-5.6-terra");
-              assert_eq!(first_route.reasoning_effort, ReasoningEffort::Medium);""",
-              """    assert_eq!(first_route.model, "gpt-5.6-luna");
-              assert!(matches!(
-                  first_route.reasoning_effort,
-                  ReasoningEffort::Low | ReasoningEffort::Medium
-              ));
-              assert_eq!(first_route.route_class, "routine");
-              assert!(first_route.confidence > 0);""",
+              block(
+                  "    assert_eq!(first_route.model, \"gpt-5.6-terra\");",
+                  "    assert_eq!(first_route.reasoning_effort, ReasoningEffort::Medium);",
+              ),
+              block(
+                  "    assert_eq!(first_route.model, \"gpt-5.6-luna\");",
+                  "    assert!(matches!(",
+                  "        first_route.reasoning_effort,",
+                  "        ReasoningEffort::Low | ReasoningEffort::Medium",
+                  "    ));",
+                  "    assert_eq!(first_route.route_class, \"routine\");",
+                  "    assert!(first_route.confidence > 0);",
+              ),
           )
 
-          # Diagnostic helper is no longer part of the final branch.
           Path(".github/workflows/router-v3-inspect.yml").unlink(missing_ok=True)
           Path(".github/workflows/router-v3-finalize.yml").unlink(missing_ok=True)
           PY
