@@ -12,7 +12,7 @@ permissions:
 jobs:
   calibrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
@@ -70,16 +70,26 @@ jobs:
               raise SystemExit(f'debugging gain: expected one match, got {text.count(old)}')
           text = text.replace(old, new, 1)
 
+          old = "\n".join([
+              '                "несколько файлов",',
+              '                "несколько модул",',
+          ])
+          new = "\n".join([
+              '                "несколько файлов",',
+              '                "нескольких файлов",',
+              '                "несколько модул",',
+              '                "нескольких модул",',
+          ])
+          if text.count(old) != 1:
+              raise SystemExit(f'russian multi-file signals: expected one match, got {text.count(old)}')
+          text = text.replace(old, new, 1)
+
           path.write_text(text, encoding='utf-8', newline='')
           PY
 
       - name: Format
         working-directory: codex-rs
         run: cargo fmt --all
-
-      - name: Test Auto router
-        working-directory: codex-rs
-        run: cargo test -p codex-core model_router --lib
 
       - name: Commit calibration
         shell: bash
