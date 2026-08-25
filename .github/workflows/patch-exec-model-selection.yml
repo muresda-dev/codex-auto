@@ -13,7 +13,7 @@ permissions:
 jobs:
   patch:
     name: Patch codex-exec and clean up helper
-    runs-on: [self-hosted, Windows, X64, codex-auto, windows-x64]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
@@ -25,30 +25,36 @@ jobs:
           persist-credentials: true
 
       - name: Apply source fix and push
-        shell: pwsh
+        shell: bash
         run: |
-          $path = Join-Path $env:GITHUB_WORKSPACE 'codex-rs\exec\src\lib.rs'
-          $text = [System.IO.File]::ReadAllText($path)
-          $newline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+          set -euo pipefail
 
-          $needle = "                        model: None,$newline                        service_tier: None,"
-          $replacement = "                        model: None,$newline                        model_selection: None,$newline                        service_tier: None,"
+          python - <<'PY'
+          from pathlib import Path
 
-          $count = ([regex]::Matches($text, [regex]::Escape($needle))).Count
-          if ($count -ne 1) {
-            throw "Expected exactly one TurnStartParams model/service_tier sequence, found $count."
-          }
+          path = Path('codex-rs/exec/src/lib.rs')
+          text = path.read_text(encoding='utf-8')
+          newline = '\r\n' if '\r\n' in text else '\n'
+          needle = f"                        model: None,{newline}                        service_tier: None,"
+          replacement = (
+              f"                        model: None,{newline}"
+              f"                        model_selection: None,{newline}"
+              f"                        service_tier: None,"
+          )
 
-          $patched = $text.Replace($needle, $replacement)
-          $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-          [System.IO.File]::WriteAllText($path, $patched, $utf8NoBom)
+          count = text.count(needle)
+          if count != 1:
+              raise SystemExit(
+                  f'Expected exactly one TurnStartParams model/service_tier sequence, found {count}.'
+              )
 
-          $helper = Join-Path $env:GITHUB_WORKSPACE '.github\workflows\patch-exec-model-selection.yml'
-          Remove-Item $helper -Force
+          path.write_text(text.replace(needle, replacement), encoding='utf-8', newline='')
+          Path('.github/workflows/patch-exec-model-selection.yml').unlink()
+          PY
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- 'codex-rs/exec/src/lib.rs' '.github/workflows/patch-exec-model-selection.yml'
+          git add -- codex-rs/exec/src/lib.rs .github/workflows/patch-exec-model-selection.yml
           git diff --cached --check
           git commit -m 'fix(exec): initialize turn model selection'
           git push origin HEAD:ci/windows-self-hosted
