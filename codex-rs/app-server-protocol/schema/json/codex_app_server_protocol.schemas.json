@@ -5467,6 +5467,26 @@
           "properties": {
             "method": {
               "enum": [
+                "model/autoRouteSelected"
+              ],
+              "title": "Model/autoRouteSelectedNotificationMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/v2/AutoModelRouteSelectedNotification"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "title": "Model/autoRouteSelectedNotification",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "enum": [
                 "model/verification"
               ],
               "title": "Model/verificationNotificationMethod",
@@ -7538,6 +7558,31 @@
             "type": "string"
           }
         ]
+      },
+      "AutoModelRouteSelectedNotification": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "reasoningEffort": {
+            "$ref": "#/definitions/v2/ReasoningEffort"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "turnId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "reasoningEffort",
+          "threadId",
+          "turnId"
+        ],
+        "title": "AutoModelRouteSelectedNotification",
+        "type": "object"
       },
       "AutoReviewDecisionSource": {
         "description": "[UNSTABLE] Source that produced a terminal approval auto-review decision.",
@@ -14749,6 +14794,14 @@
         ],
         "title": "ModelSafetyBufferingUpdatedNotification",
         "type": "object"
+      },
+      "ModelSelectionMode": {
+        "description": "Selects whether a thread uses a caller-chosen model or lets Codex choose a catalog-backed model for each user turn.\n\n`Auto` is a local routing mode. It is never a model identifier sent to a model provider.",
+        "enum": [
+          "manual",
+          "auto"
+        ],
+        "type": "string"
       },
       "ModelServiceTier": {
         "properties": {
@@ -22330,6 +22383,9 @@
           "modelProvider": {
             "type": "string"
           },
+          "modelSelection": {
+            "$ref": "#/definitions/v2/ModelSelectionMode"
+          },
           "personality": {
             "anyOf": [
               {
@@ -22367,6 +22423,7 @@
           "cwd",
           "model",
           "modelProvider",
+          "modelSelection",
           "sandboxPolicy"
         ],
         "type": "object"
