@@ -1,0 +1,54 @@
+name: Apply exec model selection fix
+
+on:
+  push:
+    branches:
+      - ci/windows-self-hosted
+    paths:
+      - .github/workflows/patch-exec-model-selection.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    name: Patch codex-exec and clean up helper
+    runs-on: [self-hosted, Windows, X64, codex-auto, windows-x64]
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v6
+        with:
+          ref: ci/windows-self-hosted
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply source fix and push
+        shell: pwsh
+        run: |
+          $path = Join-Path $env:GITHUB_WORKSPACE 'codex-rs\exec\src\lib.rs'
+          $text = [System.IO.File]::ReadAllText($path)
+          $newline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+
+          $needle = "                        model: None,$newline                        service_tier: None,"
+          $replacement = "                        model: None,$newline                        model_selection: None,$newline                        service_tier: None,"
+
+          $count = ([regex]::Matches($text, [regex]::Escape($needle))).Count
+          if ($count -ne 1) {
+            throw "Expected exactly one TurnStartParams model/service_tier sequence, found $count."
+          }
+
+          $patched = $text.Replace($needle, $replacement)
+          $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          [System.IO.File]::WriteAllText($path, $patched, $utf8NoBom)
+
+          $helper = Join-Path $env:GITHUB_WORKSPACE '.github\workflows\patch-exec-model-selection.yml'
+          Remove-Item $helper -Force
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- 'codex-rs/exec/src/lib.rs' '.github/workflows/patch-exec-model-selection.yml'
+          git diff --cached --check
+          git commit -m 'fix(exec): initialize turn model selection'
+          git push origin HEAD:ci/windows-self-hosted
