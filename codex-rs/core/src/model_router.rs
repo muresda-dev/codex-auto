@@ -98,10 +98,9 @@ impl ModelRouter for CatalogModelRouter {
                 })
             })
             .or_else(|| {
-                request
-                    .catalog
-                    .iter()
-                    .find(|model| model.is_default && is_selectable(model) && requirements.supported_by(model))
+                request.catalog.iter().find(|model| {
+                    model.is_default && is_selectable(model) && requirements.supported_by(model)
+                })
             })
             .or_else(|| {
                 request
@@ -145,10 +144,9 @@ fn fallback_decision(request: &ModelRouterRequest<'_>) -> ModelRouteDecision {
                 && requirements.supported_by(model)
         })
         .or_else(|| {
-            request
-                .catalog
-                .iter()
-                .find(|model| model.is_default && is_selectable(model) && requirements.supported_by(model))
+            request.catalog.iter().find(|model| {
+                model.is_default && is_selectable(model) && requirements.supported_by(model)
+            })
         })
         .or_else(|| {
             request

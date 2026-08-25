@@ -3846,7 +3846,7 @@ async fn auto_model_advertising_advanced_effort_opens_reasoning_picker() {
         .push(ReasoningEffortPreset {
             effort: ReasoningEffortConfig::Ultra,
             description: "Ultra reasoning".to_string(),
-    });
+        });
     chat.open_model_popup_with_presets(vec![preset]);
 
     chat.handle_key_event(KeyEvent::from(KeyCode::Down));
