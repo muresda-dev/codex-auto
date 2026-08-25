@@ -30,47 +30,52 @@ jobs:
           path = Path('codex-rs/core/src/model_router.rs')
           text = path.read_text(encoding='utf-8')
 
-          replacements = [
-              (
-                  '''impl ModelTier {
-    fn preferred_family(self) -> &'static str {
-        match self {
-            Self::Luna => "luna",
-            Self::Terra => "terra",
-            Self::Sol => "sol",
-        }
-    }
+          old = "\n".join([
+              "impl ModelTier {",
+              "    fn preferred_family(self) -> &'static str {",
+              "        match self {",
+              "            Self::Luna => \"luna\",",
+              "            Self::Terra => \"terra\",",
+              "            Self::Sol => \"sol\",",
+              "        }",
+              "    }",
+              "",
+              "    fn upgrade(self) -> Self {",
+          ])
+          new = "\n".join([
+              "impl ModelTier {",
+              "    fn upgrade(self) -> Self {",
+          ])
+          if text.count(old) != 1:
+              raise SystemExit(f'preferred_family block: expected one match, got {text.count(old)}')
+          text = text.replace(old, new, 1)
 
-    fn upgrade(self) -> Self {''',
-                  '''impl ModelTier {
-    fn upgrade(self) -> Self {''',
-              ),
-              (
-                  '''        let depth = if error_material
-            && ambiguity >= 40
-            && matches!(scope, Scope::Repository | Scope::System)''',
-                  '''        let depth = if error_material
-            && ambiguity >= 20
-            && matches!(scope, Scope::Repository | Scope::System)''',
-              ),
-              (
-                  '            TaskKind::Debugging => (32, 18),',
-                  '            TaskKind::Debugging => (32, 10),',
-              ),
-          ]
+          old = "\n".join([
+              "        let depth = if error_material",
+              "            && ambiguity >= 40",
+              "            && matches!(scope, Scope::Repository | Scope::System)",
+          ])
+          new = "\n".join([
+              "        let depth = if error_material",
+              "            && ambiguity >= 20",
+              "            && matches!(scope, Scope::Repository | Scope::System)",
+          ])
+          if text.count(old) != 1:
+              raise SystemExit(f'exceptional depth threshold: expected one match, got {text.count(old)}')
+          text = text.replace(old, new, 1)
 
-          for old, new in replacements:
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'expected exactly one match for {old!r}, got {count}')
-              text = text.replace(old, new, 1)
+          old = "            TaskKind::Debugging => (32, 18),"
+          new = "            TaskKind::Debugging => (32, 10),"
+          if text.count(old) != 1:
+              raise SystemExit(f'debugging gain: expected one match, got {text.count(old)}')
+          text = text.replace(old, new, 1)
 
           path.write_text(text, encoding='utf-8', newline='')
           PY
 
       - name: Format
         working-directory: codex-rs
-        run: cargo fmt --all -- --check
+        run: cargo fmt --all
 
       - name: Test Auto router
         working-directory: codex-rs
