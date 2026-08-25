@@ -18,15 +18,13 @@ jobs:
         with:
           ref: ci/windows-self-hosted
           fetch-depth: 1
-      - name: Locate route state and slash dispatch
+      - name: Locate TUI route plumbing
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== AUTO ROUTE OCCURRENCES ==='
-          grep -n -E -C 20 'auto_model_route' codex-rs/tui/src/chatwidget.rs || true
-          echo '=== MODEL SELECTION OCCURRENCES ==='
-          grep -n -E -C 12 'ModelSelectionChanged|model_selection' codex-rs/tui/src/chatwidget.rs | head -n 500 || true
-          echo '=== SLASH COMMAND HANDLER DEFINITIONS ==='
-          grep -n -E -C 12 'fn .*slash|handle_.*slash|dispatch_.*slash|SlashCommand::' codex-rs/tui/src/chatwidget.rs | head -n 1200 || true
-          echo '=== CORE RESOLVER TAIL ==='
-          sed -n '868,930p' codex-rs/core/src/session/turn_context.rs
+          echo '=== AUTO ROUTE GLOBAL ==='
+          grep -RIn -E -C 18 'AutoModelRoute|auto_model_route' codex-rs/tui/src || true
+          echo '=== MODEL SELECTION GLOBAL ==='
+          grep -RIn -E -C 12 'ModelSelectionChanged|model_selection' codex-rs/tui/src | head -n 900 || true
+          echo '=== SLASH GLOBAL ==='
+          grep -RIn -E -C 14 'SlashCommand::Model|SlashCommand::Status|SlashCommand::DebugConfig' codex-rs/tui/src | head -n 1200 || true
