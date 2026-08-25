@@ -18,13 +18,15 @@ jobs:
         with:
           ref: ci/windows-self-hosted
           fetch-depth: 1
-      - name: Locate TUI route plumbing
+      - name: Locate final Auto route plumbing
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== AUTO ROUTE GLOBAL ==='
-          grep -RIn -E -C 18 'AutoModelRoute|auto_model_route' codex-rs/tui/src || true
-          echo '=== MODEL SELECTION GLOBAL ==='
-          grep -RIn -E -C 12 'ModelSelectionChanged|model_selection' codex-rs/tui/src | head -n 900 || true
-          echo '=== SLASH GLOBAL ==='
-          grep -RIn -E -C 14 'SlashCommand::Model|SlashCommand::Status|SlashCommand::DebugConfig' codex-rs/tui/src | head -n 1200 || true
+          echo '=== APP SERVER AUTO ROUTE ==='
+          grep -RIn -E -C 24 'AutoModelRouteSelected|AutoModelRouteEvent|autoModelRoute' codex-rs/app-server codex-rs/app-server-protocol || true
+          echo '=== CORE ROLE SOURCE ==='
+          grep -n -E -C 18 'resolve_auto_model_route|session_source' codex-rs/core/src/session/turn_context.rs | head -n 400 || true
+          echo '=== SETTINGS AUTO ROUTE ==='
+          grep -RIn -E -C 24 'fn on_auto_model_route|auto_model_route_display_name|auto_model_route = None' codex-rs/tui/src/chatwidget || true
+          echo '=== SLASH DISPATCH ==='
+          grep -RIn -E -C 22 'SlashCommand::Model|SlashCommand::Status|SlashCommand::DebugConfig' codex-rs/tui/src/chatwidget/slash_dispatch.rs codex-rs/tui/src/slash_command.rs | head -n 1200 || true
