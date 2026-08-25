@@ -23,12 +23,12 @@ jobs:
         run: |
           set -euo pipefail
           echo '=== turn_context resolve ==='
-          rg -n -C 18 'resolve_auto_model_route|AutoModelRouteEvent|ModelRouterRequest' codex-rs/core/src/session/turn_context.rs || true
+          grep -n -E -C 18 'resolve_auto_model_route|AutoModelRouteEvent|ModelRouterRequest' codex-rs/core/src/session/turn_context.rs || true
           echo '=== protocol event ==='
-          rg -n -C 10 'struct AutoModelRouteEvent|AutoModelRoute\(' codex-rs/protocol/src/protocol.rs || true
+          grep -n -E -C 10 'struct AutoModelRouteEvent|AutoModelRoute\(' codex-rs/protocol/src/protocol.rs || true
           echo '=== TUI auto route ==='
-          rg -n -C 14 'AutoModelRoute|auto_model_route|auto route|model_selection' codex-rs/tui/src || true
+          grep -RIn -E -C 14 'AutoModelRoute|auto_model_route|auto route|model_selection' codex-rs/tui/src || true
           echo '=== slash dispatch ==='
-          rg -n -C 12 'SlashCommand::Model|SlashCommand::Status|SlashCommand::DebugConfig' codex-rs/tui/src/chatwidget.rs || true
+          grep -n -E -C 12 'SlashCommand::Model|SlashCommand::Status|SlashCommand::DebugConfig' codex-rs/tui/src/chatwidget.rs || true
           echo '=== multi agent role/config ==='
-          rg -n -C 8 'role.*model|reasoning_effort.*role|role.*reasoning|parent_thread_id|SessionSource::SubAgent|SubAgent' codex-rs/core/src/session/turn_context.rs codex-rs/core/src/codex.rs codex-rs/core/src || true
+          grep -RIn -E -C 8 'role.*model|reasoning_effort.*role|role.*reasoning|parent_thread_id|SessionSource::SubAgent|SubAgent' codex-rs/core/src/session/turn_context.rs codex-rs/core/src/codex.rs codex-rs/core/src || true
