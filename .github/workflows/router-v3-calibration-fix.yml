@@ -1,0 +1,88 @@
+name: Calibrate Router v3
+
+on:
+  push:
+    branches: [ci/windows-self-hosted]
+    paths:
+      - .github/workflows/router-v3-calibration-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ci/windows-self-hosted
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Calibrate routing policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('codex-rs/core/src/model_router.rs')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  '''impl ModelTier {
+    fn preferred_family(self) -> &'static str {
+        match self {
+            Self::Luna => "luna",
+            Self::Terra => "terra",
+            Self::Sol => "sol",
+        }
+    }
+
+    fn upgrade(self) -> Self {''',
+                  '''impl ModelTier {
+    fn upgrade(self) -> Self {''',
+              ),
+              (
+                  '''        let depth = if error_material
+            && ambiguity >= 40
+            && matches!(scope, Scope::Repository | Scope::System)''',
+                  '''        let depth = if error_material
+            && ambiguity >= 20
+            && matches!(scope, Scope::Repository | Scope::System)''',
+              ),
+              (
+                  '            TaskKind::Debugging => (32, 18),',
+                  '            TaskKind::Debugging => (32, 10),',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one match for {old!r}, got {count}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8', newline='')
+          PY
+
+      - name: Format
+        working-directory: codex-rs
+        run: cargo fmt --all -- --check
+
+      - name: Test Auto router
+        working-directory: codex-rs
+        run: cargo test -p codex-core model_router --lib
+
+      - name: Commit calibration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add codex-rs/core/src/model_router.rs
+          git diff --cached --check
+          git commit -m 'fix(auto): calibrate router v3 model thresholds'
+          git push origin HEAD:ci/windows-self-hosted
