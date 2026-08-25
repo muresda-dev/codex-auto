@@ -1,0 +1,122 @@
+name: Calibrate Terra Router V3
+
+on:
+  push:
+    branches:
+      - ci/windows-self-hosted
+
+permissions:
+  contents: write
+
+jobs:
+  calibrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Calibrate Terra range
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          router = Path('codex-rs/core/src/model_router.rs')
+          text = router.read_text(encoding='utf-8')
+
+          old = 'const TERRA_OVER_LUNA_THRESHOLD: u8 = 50;'
+          new = 'const TERRA_OVER_LUNA_THRESHOLD: u8 = 45;'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('Terra threshold anchor not found')
+
+          old_research = '''                "research",
+                "compare approaches",
+                "evaluate options",
+                "investigate alternatives",
+                "исследуй",
+                "сравни подход",
+                "оцени вариант",
+                "сравни вариант",'''
+          new_research = '''                "research",
+                "compare ",
+                "compare approaches",
+                "evaluate options",
+                "investigate alternatives",
+                "исследуй",
+                "сравни ",
+                "сравни подход",
+                "оцени вариант",
+                "сравни вариант",'''
+          if old_research in text:
+              text = text.replace(old_research, new_research, 1)
+          elif new_research not in text:
+              raise SystemExit('Research signal anchor not found')
+
+          router.write_text(text, encoding='utf-8')
+
+          tests = Path('codex-rs/core/src/model_router_tests.rs')
+          text = tests.read_text(encoding='utf-8')
+          marker = '''#[test]
+fn real_world_architecture_prompt_routes_to_sol_high() {'''
+          addition = r'''#[test]
+fn medium_explanations_and_technology_comparisons_prefer_terra() {
+    let prompts = [
+        "Объясни, почему в Django возникает проблема N+1 запросов. Сравни select_related и prefetch_related, приведи примеры, когда использовать каждый вариант, и назови типичные ошибки.",
+        "Сравни Celery и обычные фоновые задачи через asyncio для Django-приложения. Объясни преимущества и ограничения каждого подхода и в каких ситуациях ты выбрал бы один вместо другого.",
+    ];
+
+    for prompt in prompts {
+        let decision = route_text(prompt, "gpt-5.6-terra", None, false);
+        assert_eq!(
+            decision.model, "gpt-5.6-terra",
+            "medium analytical prompt should route to Terra: {prompt}; signals={:?}; terra_gain={}; sol_gain={}",
+            decision.signals, decision.terra_over_luna_gain, decision.sol_over_terra_gain
+        );
+        assert!(decision.terra_over_luna_gain >= TERRA_OVER_LUNA_THRESHOLD);
+        assert!(decision.sol_over_terra_gain < SOL_OVER_TERRA_THRESHOLD);
+    }
+}
+
+#[test]
+fn local_implementation_and_review_have_terra_floor_by_value() {
+    let prompts = [
+        "Реализуй в этом файле функцию нормализации данных и добавь тесты для основных случаев.",
+        "Проведи код-ревью этого файла, найди потенциальные ошибки и объясни замечания.",
+    ];
+
+    for prompt in prompts {
+        let decision = route_text(prompt, "gpt-5.6-terra", None, false);
+        assert_eq!(
+            decision.model, "gpt-5.6-terra",
+            "ordinary engineering work should route to Terra: {prompt}; signals={:?}; terra_gain={}; sol_gain={}",
+            decision.signals, decision.terra_over_luna_gain, decision.sol_over_terra_gain
+        );
+    }
+}
+
+'''
+          if 'fn medium_explanations_and_technology_comparisons_prefer_terra()' not in text:
+              if marker not in text:
+                  raise SystemExit('Test insertion anchor not found')
+              text = text.replace(marker, addition + marker, 1)
+          tests.write_text(text, encoding='utf-8')
+          PY
+
+          cd codex-rs
+          cargo fmt --all -- --config imports_granularity=Item
+          cd ..
+
+          if git diff --quiet; then
+            echo "Calibration is already applied."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add codex-rs/core/src/model_router.rs codex-rs/core/src/model_router_tests.rs
+          git commit -m "fix(auto): widen Terra routing band"
+          git push origin HEAD:ci/windows-self-hosted
