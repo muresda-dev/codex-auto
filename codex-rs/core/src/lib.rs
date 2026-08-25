@@ -74,6 +74,7 @@ pub(crate) mod mcp;
 mod mcp_skill_dependencies;
 mod mcp_tool_approval_templates;
 mod mcp_tool_exposure;
+mod model_router;
 mod network_policy_decision;
 pub use mcp::McpManager;
 mod original_image_detail;
