@@ -400,7 +400,7 @@ jobs:
       - name: Regenerate app-server protocol schemas
         shell: bash
         working-directory: codex-rs
-        run: cargo run -p codex-app-server-protocol --bin write_schema_fixtures
+        run: cargo run -p codex-app-server --bin codex-write-app-server-schema
 
       - name: Commit Router v3
         shell: bash
